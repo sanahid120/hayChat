@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:hay_chat/auth/presentation/widgets/intro_widget.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../app/app_strings.dart';
 import '../../../app/asset_paths.dart';
 import '../models/onboarding_model.dart';
+import '../widgets/intro_widget.dart';
+import 'sign_in_screen.dart';
 
 class IntroductionScreen extends StatefulWidget {
   const IntroductionScreen({super.key});
@@ -23,7 +25,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
   final List<IntroductionModel> _introductionPages = [
     IntroductionModel(
       title: 'Welcome to',
-      highlightedTitle: 'HayChat',
+      highlightedTitle: AppStrings.appName,
       description: 'Simple, fast and secure messaging for everyone.',
       imagePath: AssetPaths.illustration,
     ),
@@ -74,7 +76,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
   }
 
   void _goToSignInScreen() {
-    Navigator.pushReplacementNamed(context, '/sign-in');
+    Navigator.pushReplacementNamed(context, SignInScreen.routeName);
   }
 
   @override
