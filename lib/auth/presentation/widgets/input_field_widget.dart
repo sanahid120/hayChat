@@ -6,14 +6,14 @@ class InputField extends StatelessWidget {
   const InputField({
     super.key,
     required this.controller,
-    required this.label,
+    this.label,
     required this.hintText,
     this.validator,
     this.icon,
   });
 
   final TextEditingController controller;
-  final String label;
+  final String? label;
   final String hintText;
   final String? Function(String?)? validator;
   final IconData? icon;
@@ -24,7 +24,7 @@ class InputField extends StatelessWidget {
     return Column(
       crossAxisAlignment: .start,
       children: [
-        Text(label,style: TextTheme.of(
+        Text(label??"",style: TextTheme.of(
           context,
         ).bodyLarge?.copyWith(color: AppColors.textHint),),
         TextFormField(

@@ -5,6 +5,7 @@ import 'package:hay_chat/shared/utils/validators.dart';
 import '../../../app/app_colors.dart';
 import '../../../app/app_strings.dart';
 import '../widgets/input_field_widget.dart';
+import 'forget_password.dart';
 import 'sign_up_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -23,7 +24,7 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(backgroundColor: AppColors.background,),
+      appBar: AppBar(backgroundColor: AppColors.background),
 
       body: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -87,9 +88,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       SizedBox(height: 20),
 
                       FilledButton(
-                        onPressed: () {
-
-                        },
+                        onPressed: () {},
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primaryDark,
                           foregroundColor: Colors.white,
@@ -141,10 +140,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                             TextButton(
                               onPressed: () {
-                                onPressedForgotPassword(
-                                  context,
-                                  _emailController.text.trim(),
-                                );
+                                onPressedForgotPassword(context);
                               },
                               child: Text(
                                 AppStrings.forgotPassword,
@@ -167,5 +163,7 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  void onPressedForgotPassword(BuildContext context, String trim) {}
+  void onPressedForgotPassword(BuildContext context) {
+    Navigator.pushNamed(context, ForgetPasswordScreen.routeName);
+  }
 }
