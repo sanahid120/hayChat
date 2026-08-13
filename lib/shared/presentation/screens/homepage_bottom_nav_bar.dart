@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:hay_chat/features/presentation/screens/homescreen.dart';
 import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
@@ -16,8 +14,6 @@ class HomepageBottomNavBar extends StatefulWidget {
 }
 
 class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
-
-
   @override
   Widget build(BuildContext context) {
     return Consumer<HomepageMainNavProvider>(
@@ -27,9 +23,7 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
 
           body: IndexedStack(
             index: mainNavProvider.selectedIndex,
-            children: [
-              Homescreen(),
-            ],
+            children: [Homescreen(), SizedBox(), SizedBox()],
           ),
 
           bottomNavigationBar: BottomNavigationBar(
@@ -40,7 +34,7 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
             unselectedItemColor: Colors.grey,
             showUnselectedLabels: true,
 
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.scaffoldBackground,
             elevation: 5,
             currentIndex: mainNavProvider.selectedIndex,
             selectedItemColor: AppColors.primary,
@@ -57,7 +51,6 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
                 icon: Icon(Icons.person),
                 label: "Profile",
               ),
-
             ],
           ),
         );
