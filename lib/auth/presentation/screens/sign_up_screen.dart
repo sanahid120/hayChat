@@ -1,29 +1,30 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/shared/utils/validators.dart';
 
 import '../../../app/app_colors.dart';
-import '../../../app/app_strings.dart';
 import '../widgets/input_field_widget.dart';
-import 'sign_up_screen.dart';
+import 'sign_in_screen.dart';
 
-class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
-  static const String routeName = '/sign-in';
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
+  static const String routeName = '/sign-up';
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignInScreenState extends State<SignInScreen> {
+class _SignUpScreenState extends State<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _fullNameController = TextEditingController();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(backgroundColor: AppColors.background,),
+appBar: AppBar(backgroundColor: AppColors.background,),
 
       body: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -36,7 +37,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 const SizedBox(height: 46),
 
                 Text(
-                  AppStrings.welcomeMsg,
+                  AppStrings.createAccount,
 
                   style: TextTheme.of(
                     context,
@@ -44,7 +45,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
 
                 Text(
-                  AppStrings.signInToContinue,
+                  AppStrings.getStarted,
                   style: TextTheme.of(
                     context,
                   ).headlineSmall?.copyWith(color: AppColors.textHint),
@@ -56,6 +57,23 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      InputField(
+                        controller: _fullNameController,
+                        label: AppStrings.name,
+                        hintText: "Enter your name",
+                        icon: Icons.person,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your name';
+                          }
+                          if (value.length < 3) {
+                            return 'Name must be at least 3 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 20),
+
                       InputField(
                         controller: _emailController,
                         label: AppStrings.email,
@@ -71,6 +89,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         },
                       ),
                       SizedBox(height: 20),
+
                       InputField(
                         controller: _passwordController,
                         label: AppStrings.password,
@@ -87,9 +106,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       SizedBox(height: 20),
 
                       FilledButton(
-                        onPressed: () {
-
-                        },
+                        onPressed: () {},
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.primaryDark,
                           foregroundColor: Colors.white,
@@ -99,7 +116,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
                         child: Text(
-                          AppStrings.signIn,
+                          AppStrings.signUp,
                           style: TextTheme.of(
                             context,
                           ).bodyLarge?.copyWith(color: AppColors.textPrimary),
@@ -116,10 +133,10 @@ class _SignInScreenState extends State<SignInScreen> {
                                 style: TextTheme.of(context).bodyLarge
                                     ?.copyWith(color: AppColors.textHint),
 
-                                text: AppStrings.doNotHaveAnAccount,
+                                text: AppStrings.alreadyHaveAnAccount,
                                 children: [
                                   TextSpan(
-                                    text: AppStrings.signUp,
+                                    text: AppStrings.signIn,
                                     style: TextTheme.of(context).bodyLarge
                                         ?.copyWith(
                                           color: AppColors.primary,
@@ -129,28 +146,13 @@ class _SignInScreenState extends State<SignInScreen> {
                                         ),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () {
-                                        Navigator.pushNamed(
+                                        Navigator.pushReplacementNamed(
                                           context,
-                                          SignUpScreen.routeName,
+                                          SignInScreen.routeName,
                                         );
                                       },
                                   ),
                                 ],
-                              ),
-                            ),
-
-                            TextButton(
-                              onPressed: () {
-                                onPressedForgotPassword(
-                                  context,
-                                  _emailController.text.trim(),
-                                );
-                              },
-                              child: Text(
-                                AppStrings.forgotPassword,
-                                style: TextTheme.of(
-                                  context,
-                                ).bodyLarge?.copyWith(color: AppColors.primary),
                               ),
                             ),
                           ],
@@ -166,6 +168,4 @@ class _SignInScreenState extends State<SignInScreen> {
       ),
     );
   }
-
-  void onPressedForgotPassword(BuildContext context, String trim) {}
 }

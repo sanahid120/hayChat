@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/presentation/screens/intorduction.dart';
 import '../auth/presentation/screens/sign_in_screen.dart';
+import '../auth/presentation/screens/sign_up_screen.dart';
 import '../auth/presentation/screens/splash_screen.dart';
 
 class AppRoutes {
@@ -18,6 +19,10 @@ class AppRoutes {
 
       case SignInScreen.routeName:
         widget = SignInScreen();
+        break;
+
+      case SignUpScreen.routeName:
+        widget = SignUpScreen();
         break;
 
       default:

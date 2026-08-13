@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/auth/presentation/screens/intorduction.dart';
+import 'package:hay_chat/auth/presentation/screens/sign_in_screen.dart';
 
 import '../auth/presentation/screens/splash_screen.dart';
 import 'app_routes.dart';
@@ -18,14 +19,8 @@ class MyApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
 
-      initialRoute: IntroductionScreen.routeName,
+      initialRoute: SignInScreen.routeName,
       onGenerateRoute: AppRoutes.onGenerateRoute,
-
-
-
-
-
-
     );
   }
 }
