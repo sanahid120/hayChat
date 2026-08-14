@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/auth/presentation/widgets/input_field_widget.dart';
 
-import '../../../app/app_colors.dart';
-import '../../../app/asset_paths.dart';
+import '../../../../app/app_colors.dart';
+import '../../../chat/presentation/screens/chat_screen.dart';
 import '../widgets/home_contact_list_Tile.dart';
 
 class Homescreen extends StatefulWidget {
@@ -27,7 +27,9 @@ class _HomescreenState extends State<Homescreen> {
           ).textTheme.headlineLarge?.copyWith(color: AppColors.textPrimary),
         ),
         backgroundColor: AppColors.background,
-        actions: [IconButton(onPressed: () {}, icon: Icon(Icons.more_vert))],
+        actions: [
+          IconButton(onPressed: () {}, icon: Icon(Icons.more_vert_rounded)),
+        ],
 
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(50),
@@ -47,14 +49,20 @@ class _HomescreenState extends State<Homescreen> {
           SizedBox(height: 20),
 
           Expanded(
-
             child: SizedBox(
               height: 200,
               child: ListView.separated(
                 scrollDirection: Axis.vertical,
                 itemCount: 20,
                 itemBuilder: (context, index) {
-                  return HomepageContactsCard();
+                  return HomepageContactsCard(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        ChatScreen.routeName,
+                      );
+                    },
+                  );
                 },
                 separatorBuilder: (context, index) {
                   return SizedBox(height: 10);
@@ -67,4 +75,3 @@ class _HomescreenState extends State<Homescreen> {
     );
   }
 }
-

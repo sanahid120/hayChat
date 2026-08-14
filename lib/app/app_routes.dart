@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 
 import '../auth/presentation/screens/forget_password.dart';
 import '../auth/presentation/screens/intorduction.dart';
@@ -33,6 +34,10 @@ class AppRoutes {
 
       case HomepageBottomNavBar.routeName:
         widget = HomepageBottomNavBar();
+        break;
+
+      case ChatScreen.routeName:
+        widget = ChatScreen();
         break;
 
       default:

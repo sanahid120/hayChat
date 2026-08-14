@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:hay_chat/features/presentation/screens/homescreen.dart';
-import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
+import '../../../features/home/presentation/screens/homescreen.dart';
+import '../data/nav_bar_provider.dart';
 
 class HomepageBottomNavBar extends StatefulWidget {
   const HomepageBottomNavBar({super.key});

@@ -1,18 +1,21 @@
 
 import 'package:flutter/material.dart';
 
-import '../../../app/app_colors.dart';
-import '../../../app/asset_paths.dart';
+import '../../../../app/app_colors.dart';
+import '../../../../app/asset_paths.dart';
+
 
 class HomepageContactsCard extends StatelessWidget {
   const HomepageContactsCard({
     super.key,
+    required this.onTap,
   });
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: ListTile(
         title: Text(
           "S A NAHID",
