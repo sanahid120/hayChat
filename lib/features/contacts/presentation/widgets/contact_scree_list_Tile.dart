@@ -4,18 +4,16 @@ import '../../../../app/app_colors.dart';
 import '../../../../app/asset_paths.dart';
 import '../../../../app/models/user_model.dart';
 
-class HomeContactTile extends StatelessWidget {
-  const HomeContactTile({
+class HomepageContactsCard extends StatelessWidget {
+  const HomepageContactsCard({
     super.key,
     required this.onTap,
     required this.user,
-    this.lastMessage,
     this.timestamp,
   });
 
   final VoidCallback onTap;
   final UserModel user;
-  final String? lastMessage;
   final Timestamp? timestamp;
 
   String _formatTimestamp(Timestamp? timestamp) {
@@ -50,7 +48,7 @@ class HomeContactTile extends StatelessWidget {
             : const AssetImage(AssetPaths.illustration) as ImageProvider,
       ),
       title: Text(
-        user.name ?? "User",
+        user.name ?? "No Name",
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
@@ -59,9 +57,9 @@ class HomeContactTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        lastMessage ?? user.email,
+        user.email,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: lastMessage != null ? AppColors.textSecondary : AppColors.textHint,
+              color: AppColors.textSecondary,
             ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -70,13 +68,18 @@ class HomeContactTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(
-            _formatTimestamp(timestamp),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textHint,
-                ),
+          if (timestamp != null)
+            Text(
+              _formatTimestamp(timestamp),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textHint,
+                  ),
+            ),
+          const Icon(
+            Icons.chevron_right,
+            color: AppColors.iconSecondary,
+            size: 18,
           ),
-          const SizedBox(height: 4),
         ],
       ),
     );

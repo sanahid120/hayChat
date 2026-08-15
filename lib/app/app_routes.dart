@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 
 import '../auth/presentation/screens/forget_password.dart';
@@ -10,22 +11,22 @@ import '../shared/presentation/screens/homepage_bottom_nav_bar.dart';
 
 class AppRoutes {
   static MaterialPageRoute<dynamic> onGenerateRoute(RouteSettings settings) {
-    Widget widget = SizedBox();
+    Widget widget = const SizedBox();
     switch (settings.name) {
       case SplashScreen.routeName:
-        widget = SplashScreen();
+        widget = const SplashScreen();
         break;
 
       case IntroductionScreen.routeName:
-        widget = IntroductionScreen();
+        widget = const IntroductionScreen();
         break;
 
       case SignInScreen.routeName:
-        widget = SignInScreen();
+        widget = const SignInScreen();
         break;
 
       case SignUpScreen.routeName:
-        widget = SignUpScreen();
+        widget = const SignUpScreen();
         break;
 
       case ForgetPasswordScreen.routeName:
@@ -33,15 +34,16 @@ class AppRoutes {
         break;
 
       case HomepageBottomNavBar.routeName:
-        widget = HomepageBottomNavBar();
+        widget = const HomepageBottomNavBar();
         break;
 
       case ChatScreen.routeName:
-        widget = ChatScreen();
+        final user = settings.arguments as UserModel?;
+        widget = ChatScreen(receiverUser: user);
         break;
 
       default:
-        widget = SplashScreen();
+        widget = const SplashScreen();
         break;
     }
 

@@ -1,46 +1,52 @@
 import 'package:flutter/material.dart';
-
 import '../../../../app/app_colors.dart';
+import '../../../../app/asset_paths.dart';
+import '../../../../app/models/user_model.dart';
 
 class AppBarWidget extends StatelessWidget {
   const AppBarWidget({
     super.key,
     required this.onTap,
+    this.user,
   });
+
   final VoidCallback onTap;
+  final UserModel? user;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap:onTap,
+      onTap: onTap,
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundImage: AssetImage("assets/images/illustration.png"),
-              ),
-            ],
+          CircleAvatar(
+            radius: 20,
+            backgroundImage: (user?.profilePicture != null && user?.profilePicture != 'null currently')
+                ? NetworkImage(user!.profilePicture!)
+                : const AssetImage(AssetPaths.illustration) as ImageProvider,
           ),
-          SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "S A N A H I D",
-                style: TextTheme.of(
-                  context,
-                ).titleLarge?.copyWith(color: AppColors.textPrimary),
-              ),
-              Text(
-                "Online",
-                style: TextTheme.of(
-                  context,
-                ).titleLarge?.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  user?.name ?? "Chat",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  "Online",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.online,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hay_chat/features/contacts/presentation/screens/contact_screen.dart';
+import 'package:hay_chat/features/profile/presentation/screens/profile.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
@@ -23,7 +25,7 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
 
           body: IndexedStack(
             index: mainNavProvider.selectedIndex,
-            children: [Homescreen(), SizedBox(), SizedBox()],
+            children: [Homescreen(), ContactScreen(), ProfileScreen()],
           ),
 
           bottomNavigationBar: BottomNavigationBar(

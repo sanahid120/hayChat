@@ -1,7 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
+import 'package:hay_chat/app/methods/scaffold_message.dart';
+import 'package:hay_chat/app/models/user_model.dart';
+import 'package:hay_chat/auth/presentation/providers/sign_up_provider.dart';
+import 'package:hay_chat/shared/presentation/screens/homepage_bottom_nav_bar.dart';
 import 'package:hay_chat/shared/utils/validators.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../widgets/input_field_widget.dart';
@@ -20,38 +25,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _fullNameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _fullNameController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-appBar: AppBar(backgroundColor: AppColors.background,),
-
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(12.0),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
-              mainAxisAlignment: .start,
-              crossAxisAlignment: .start,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 46),
-
                 Text(
                   AppStrings.createAccount,
-
-                  style: TextTheme.of(
-                    context,
-                  ).headlineLarge?.copyWith(color: AppColors.textPrimary),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineLarge
+                      ?.copyWith(color: AppColors.textPrimary),
                 ),
-
                 Text(
                   AppStrings.getStarted,
-                  style: TextTheme.of(
-                    context,
-                  ).headlineSmall?.copyWith(color: AppColors.textHint),
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(color: AppColors.textHint),
                 ),
-                SizedBox(height: 50),
-
+                const SizedBox(height: 50),
                 Form(
                   key: _formKey,
                   child: Column(
@@ -72,72 +85,69 @@ appBar: AppBar(backgroundColor: AppColors.background,),
                           return null;
                         },
                       ),
-                      SizedBox(height: 20),
-
+                      const SizedBox(height: 20),
                       InputField(
                         controller: _emailController,
                         label: AppStrings.email,
                         icon: Icons.email,
                         hintText: 'Enter your email',
-                        validator: (value) {
-                          final validator = Validators.emailValidator(value);
-                          if (validator != null) {
-                            return validator;
-                          }
-
-                          return null;
-                        },
+                        validator: Validators.emailValidator,
                       ),
-                      SizedBox(height: 20),
-
+                      const SizedBox(height: 20),
                       InputField(
                         controller: _passwordController,
                         label: AppStrings.password,
                         icon: Icons.lock,
                         hintText: 'Enter your password',
-                        validator: (value) {
-                          final validate = Validators.passwordValidator(value);
-                          if (validate != null) {
-                            return validate;
-                          }
-                          return null;
+                        validator: Validators.passwordValidator,
+                      ),
+                      const SizedBox(height: 20),
+                      Consumer<SignUpProvider>(
+                        builder: (context, signUpProvider, _) {
+                          return Visibility(
+                            visible: !signUpProvider.signUpInProgress,
+                            replacement: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            child: FilledButton(
+                              onPressed: onPressedSignUp,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primaryDark,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                AppStrings.signUp,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.copyWith(color: AppColors.textPrimary),
+                              ),
+                            ),
+                          );
                         },
                       ),
-                      SizedBox(height: 20),
-
-                      FilledButton(
-                        onPressed: () {},
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryDark,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          AppStrings.signUp,
-                          style: TextTheme.of(
-                            context,
-                          ).bodyLarge?.copyWith(color: AppColors.textPrimary),
-                        ),
-                      ),
-                      SizedBox(height: 20),
-
+                      const SizedBox(height: 20),
                       Align(
                         alignment: Alignment.center,
                         child: Column(
                           children: [
                             RichText(
                               text: TextSpan(
-                                style: TextTheme.of(context).bodyLarge
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
                                     ?.copyWith(color: AppColors.textHint),
-
                                 text: AppStrings.alreadyHaveAnAccount,
                                 children: [
                                   TextSpan(
                                     text: AppStrings.signIn,
-                                    style: TextTheme.of(context).bodyLarge
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
                                         ?.copyWith(
                                           color: AppColors.primary,
                                           decoration: TextDecoration.underline,
@@ -167,5 +177,42 @@ appBar: AppBar(backgroundColor: AppColors.background,),
         ),
       ),
     );
+  }
+
+  Future<void> onPressedSignUp() async {
+    if (_formKey.currentState!.validate()) {
+      final signUpProvider = context.read<SignUpProvider>();
+
+      bool isSuccess = await signUpProvider.signUp(
+        UserModel(
+          name: _fullNameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (isSuccess) {
+        ScaffoldMessage.showMessage(
+          'Account created successfully!',
+          context,
+          AppColors.textPrimary,
+          AppColors.success,
+        );
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          HomepageBottomNavBar.routeName,
+          (route) => false,
+        );
+      } else if (signUpProvider.errorMessage != null) {
+        ScaffoldMessage.showMessage(
+          signUpProvider.errorMessage!,
+          context,
+          AppColors.textPrimary,
+          AppColors.error,
+        );
+      }
+    }
   }
 }

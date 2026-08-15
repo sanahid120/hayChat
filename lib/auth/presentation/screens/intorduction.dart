@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:hay_chat/auth/presentation/screens/sign_up_screen.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_strings.dart';
 import '../../../app/asset_paths.dart';
-import '../models/onboarding_model.dart';
+import '../models/introduction_model.dart';
 import '../widgets/intro_widget.dart';
 import 'sign_in_screen.dart';
 
@@ -57,7 +58,7 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
 
   void _goToNextPage() {
     if (_isLastPage) {
-      _goToSignInScreen();
+      _goToSignUpScreen();
       return;
     }
 
@@ -77,6 +78,10 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
 
   void _goToSignInScreen() {
     Navigator.pushReplacementNamed(context, SignInScreen.routeName);
+  }
+
+  void _goToSignUpScreen() {
+    Navigator.pushReplacementNamed(context, SignUpScreen.routeName);
   }
 
   @override
@@ -204,7 +209,6 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
   Widget _buildExistingAccountButton() {
     return SizedBox(
       height: 48,
-      key: const ValueKey<String>('existing-account'),
       child: TextButton(
         onPressed: _goToSignInScreen,
         child: const Text(
@@ -224,4 +228,6 @@ class _IntroductionScreenState extends State<IntroductionScreen> {
     _pageController.dispose();
     super.dispose();
   }
+
+
 }

@@ -14,6 +14,7 @@ class AppStrings {
   static const String getStarted = 'Let\'s get started!';
   static const String rememberPassword = 'Remember Password?';
   static const String resetButton = 'Send Reset Link';
+  static const String signInSuccess = 'Successfully logIn';
   static const String forgotPasswordDescription = 'Enter your email and we will send you a link to reset your password';
 
 }

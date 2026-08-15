@@ -1,9 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:hay_chat/app/methods/scaffold_message.dart';
+import 'package:hay_chat/auth/presentation/providers/sign_in_provider.dart';
+import 'package:hay_chat/shared/presentation/screens/homepage_bottom_nav_bar.dart';
 import 'package:hay_chat/shared/utils/validators.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../app/app_strings.dart';
+import '../../../app/models/user_model.dart';
 import '../widgets/input_field_widget.dart';
 import 'forget_password.dart';
 import 'sign_up_screen.dart';
@@ -20,38 +27,67 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      checkUser();
+    });
+  }
+
+  void checkUser() {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (user == null) {
+        if (kDebugMode) {
+          print('User is currently signed out!');
+        }
+      } else {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          HomepageBottomNavBar.routeName,
+          (route) => false,
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(backgroundColor: AppColors.background),
-
       body: Padding(
         padding: const EdgeInsets.all(12.0),
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
-              mainAxisAlignment: .start,
-              crossAxisAlignment: .start,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 46),
-
                 Text(
                   AppStrings.welcomeMsg,
-
-                  style: TextTheme.of(
-                    context,
-                  ).headlineLarge?.copyWith(color: AppColors.textPrimary),
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-
                 Text(
                   AppStrings.signInToContinue,
-                  style: TextTheme.of(
-                    context,
-                  ).headlineSmall?.copyWith(color: AppColors.textHint),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: AppColors.textHint,
+                  ),
                 ),
-                SizedBox(height: 50),
-
+                const SizedBox(height: 50),
                 Form(
                   key: _formKey,
                   child: Column(
@@ -62,64 +98,57 @@ class _SignInScreenState extends State<SignInScreen> {
                         label: AppStrings.email,
                         icon: Icons.email,
                         hintText: 'Enter your email',
-                        validator: (value) {
-                          final validator = Validators.emailValidator(value);
-                          if (validator != null) {
-                            return validator;
-                          }
-
-                          return null;
-                        },
+                        validator: Validators.emailValidator,
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       InputField(
                         controller: _passwordController,
                         label: AppStrings.password,
                         icon: Icons.lock,
                         hintText: 'Enter your password',
-                        validator: (value) {
-                          final validate = Validators.passwordValidator(value);
-                          if (validate != null) {
-                            return validate;
-                          }
-                          return null;
+                        validator: Validators.passwordValidator,
+                      ),
+                      const SizedBox(height: 20),
+                      Consumer<SignInProvider>(
+                        builder: (context, authProvider, _) {
+                          return Visibility(
+                            visible: !authProvider.signInProgress,
+                            replacement: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                            child: FilledButton(
+                              onPressed: onPressedSignIn,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primaryDark,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: Text(
+                                AppStrings.signIn,
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(color: AppColors.textPrimary),
+                              ),
+                            ),
+                          );
                         },
                       ),
-                      SizedBox(height: 20),
-
-                      FilledButton(
-                        onPressed: () {},
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primaryDark,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          AppStrings.signIn,
-                          style: TextTheme.of(
-                            context,
-                          ).bodyLarge?.copyWith(color: AppColors.textPrimary),
-                        ),
-                      ),
-                      SizedBox(height: 20),
-
+                      const SizedBox(height: 20),
                       Align(
                         alignment: Alignment.center,
                         child: Column(
                           children: [
                             RichText(
                               text: TextSpan(
-                                style: TextTheme.of(context).bodyLarge
+                                style: Theme.of(context).textTheme.bodyLarge
                                     ?.copyWith(color: AppColors.textHint),
-
                                 text: AppStrings.doNotHaveAnAccount,
                                 children: [
                                   TextSpan(
                                     text: AppStrings.signUp,
-                                    style: TextTheme.of(context).bodyLarge
+                                    style: Theme.of(context).textTheme.bodyLarge
                                         ?.copyWith(
                                           color: AppColors.primary,
                                           decoration: TextDecoration.underline,
@@ -137,16 +166,12 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ],
                               ),
                             ),
-
                             TextButton(
-                              onPressed: () {
-                                onPressedForgotPassword(context);
-                              },
+                              onPressed: onPressedForgotPassword,
                               child: Text(
                                 AppStrings.forgotPassword,
-                                style: TextTheme.of(
-                                  context,
-                                ).bodyLarge?.copyWith(color: AppColors.primary),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(color: AppColors.primary),
                               ),
                             ),
                           ],
@@ -163,7 +188,43 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  void onPressedForgotPassword(BuildContext context) {
+  void onPressedForgotPassword() {
     Navigator.pushNamed(context, ForgetPasswordScreen.routeName);
+  }
+
+  Future<void> onPressedSignIn() async {
+    if (_formKey.currentState!.validate()) {
+      final authProvider = context.read<SignInProvider>();
+
+      bool isSuccess = await authProvider.signIn(
+        UserModel(
+          email: _emailController.text,
+          password: _passwordController.text,
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (isSuccess) {
+        ScaffoldMessage.showMessage(
+          AppStrings.signInSuccess,
+          context,
+          AppColors.textPrimary,
+          AppColors.success,
+        );
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          HomepageBottomNavBar.routeName,
+          (route) => false,
+        );
+      } else if (authProvider.errorMessage != null) {
+        ScaffoldMessage.showMessage(
+          authProvider.errorMessage!,
+          context,
+          AppColors.textPrimary,
+          AppColors.error,
+        );
+      }
+    }
   }
 }

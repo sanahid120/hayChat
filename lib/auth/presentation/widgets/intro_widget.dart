@@ -1,7 +1,7 @@
 import '../../../app/app_colors.dart';
 import 'package:flutter/material.dart';
 
-import '../models/onboarding_model.dart';
+import '../models/introduction_model.dart';
 import 'illustration_error.dart';
 class IntroductionPage extends StatelessWidget {
   final IntroductionModel introduction;
