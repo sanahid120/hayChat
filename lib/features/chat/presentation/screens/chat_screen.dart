@@ -22,18 +22,14 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
   String? _currentUserName;
 
   @override
   void initState() {
     super.initState();
-    _messageController.addListener(() {
-      setState(() {});
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchCurrentUserName();
-    });
+    _fetchCurrentUserName();
   }
 
   Future<void> _fetchCurrentUserName() async {
@@ -55,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -149,6 +146,9 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       await batch.commit();
+      
+      // Scroll to bottom after sending
+      _scrollToBottom();
     } catch (e) {
       if (mounted) {
         ScaffoldMessage.showMessage(
@@ -158,6 +158,16 @@ class _ChatScreenState extends State<ChatScreen> {
           AppColors.error,
         );
       }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 100,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -174,12 +184,13 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.scaffoldBackground,
-        title: AppBarWidget(user: widget.receiverUser, onTap: () {}),
+        title: AppBarWidget(
+          user: widget.receiverUser,
+          onTap: () {},
+        ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert_rounded),
-          ),
+              onPressed: () {}, icon: const Icon(Icons.more_vert_rounded)),
         ],
       ),
       body: Column(
@@ -192,7 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   .collection('messages')
                   .doc(widget.receiverUser!.uid)
                   .collection('chats')
-                  .orderBy('dateTimestamp', descending: true)
+                  .orderBy('dateTimestamp', descending: false)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -209,47 +220,70 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
 
                 final docs = snapshot.data!.docs;
+                final messages = docs
+                    .map((doc) =>
+                        ChatModel.fromMap(doc.data() as Map<String, dynamic>))
+                    .toList();
+
+                // Scroll to bottom on new messages if we are near bottom
+                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
                 return ListView.builder(
-                  reverse: true,
-                  itemCount: docs.length,
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final msg = ChatModel.fromMap(
-                      docs[index].data() as Map<String, dynamic>,
-                    );
+                    final msg = messages[index];
                     final bool isMe = msg.sender == _currentUid;
 
-                    return Align(
-                      alignment: isMe
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 4,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? AppColors.senderBubble
-                              : AppColors.receiverBubble,
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: Radius.circular(isMe ? 16 : 0),
-                            bottomRight: Radius.circular(isMe ? 0 : 16),
+                    bool showDateHeader = false;
+                    if (index == 0) {
+                      showDateHeader = true;
+                    } else {
+                      final prevMsg = messages[index - 1];
+                      if (msg.dateTimestamp != null &&
+                          prevMsg.dateTimestamp != null) {
+                        if (msg.dateTimestamp!.day != prevMsg.dateTimestamp!.day ||
+                            msg.dateTimestamp!.month !=
+                                prevMsg.dateTimestamp!.month ||
+                            msg.dateTimestamp!.year !=
+                                prevMsg.dateTimestamp!.year) {
+                          showDateHeader = true;
+                        }
+                      }
+                    }
+
+                    return Column(
+                      children: [
+                        if (showDateHeader && msg.dateTimestamp != null)
+                          DateHeaderWidget(date: msg.dateTimestamp!),
+                        Align(
+                          alignment:
+                              isMe ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? AppColors.senderBubble
+                                  : AppColors.receiverBubble,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(16),
+                                topRight: const Radius.circular(16),
+                                bottomLeft: Radius.circular(isMe ? 16 : 0),
+                                bottomRight: Radius.circular(isMe ? 0 : 16),
+                              ),
+                            ),
+                            child: Text(
+                              msg.message,
+                              style: const TextStyle(
+                                  color: AppColors.textPrimary, fontSize: 16),
+                            ),
                           ),
                         ),
-                        child: Text(
-                          msg.message,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
+                      ],
                     );
                   },
                 );
@@ -263,5 +297,48 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+}
+
+class DateHeaderWidget extends StatelessWidget {
+  final DateTime date;
+  const DateHeaderWidget({super.key, required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          _formatDate(date),
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day) {
+      return 'Today';
+    }
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day) {
+      return 'Yesterday';
+    }
+    return "${date.day}/${date.month}/${date.year}";
   }
 }

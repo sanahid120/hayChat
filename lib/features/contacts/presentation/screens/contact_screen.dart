@@ -29,7 +29,8 @@ class _ContactScreenState extends State<ContactScreen> {
   }
 
   Future<void> _searchUser(String email) async {
-    if (email.isEmpty) {
+    final query = email.trim();
+    if (query.isEmpty) {
       setState(() {
         _isSearching = false;
         _searchResults = [];
@@ -47,18 +48,12 @@ class _ContactScreenState extends State<ContactScreen> {
     try {
       final querySnapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('email', isEqualTo: email.trim())
+          .where('email', isEqualTo: query)
           .get();
 
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
-
       final results = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        return UserModel.fromJson({
-          ...data,
-          'uid': doc.id,
-        });
-      }).where((user) => user.uid != currentUid).toList();
+        return UserModel.fromJson(doc.data(), doc.id);
+      }).where((user) => user.uid != _currentUid).toList();
 
       setState(() {
         _searchResults = results;
@@ -109,7 +104,7 @@ class _ContactScreenState extends State<ContactScreen> {
               controller: searchController,
               style: const TextStyle(color: AppColors.textPrimary),
               onChanged: (value) {
-                if (value.isEmpty) {
+                if (value.isEmpty && _isSearching) {
                   setState(() {
                     _isSearching = false;
                     _error = null;
@@ -144,11 +139,6 @@ class _ContactScreenState extends State<ContactScreen> {
     if (_error != null) {
       return Center(
         child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
-      );
-    }
-    if (_searchResults.isEmpty) {
-      return const Center(
-        child: Text("No users found", style: TextStyle(color: AppColors.textSecondary)),
       );
     }
 
@@ -186,11 +176,27 @@ class _ContactScreenState extends State<ContactScreen> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(
-            child: Text(
-              "Search for users by email to start chatting",
-              style: TextStyle(color: AppColors.textSecondary),
-              textAlign: TextAlign.center,
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.people_outline, size: 80, color: AppColors.textHint),
+                const SizedBox(height: 16),
+                const Text(
+                  "No contacts yet",
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Search for users by email to start chatting",
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           );
         }

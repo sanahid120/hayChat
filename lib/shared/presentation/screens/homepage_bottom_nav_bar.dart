@@ -22,25 +22,25 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
       builder: (context, mainNavProvider, _) {
         return Scaffold(
           extendBody: false,
-
           body: IndexedStack(
             index: mainNavProvider.selectedIndex,
-            children: [Homescreen(), ContactScreen(), ProfileScreen()],
+            children: const [
+              Homescreen(),
+              ContactScreen(),
+              ProfileScreen(),
+            ],
           ),
-
           bottomNavigationBar: BottomNavigationBar(
             onTap: (int index) {
               mainNavProvider.updateIndex(index);
             },
-
             unselectedItemColor: Colors.grey,
             showUnselectedLabels: true,
-
             backgroundColor: AppColors.scaffoldBackground,
             elevation: 5,
             currentIndex: mainNavProvider.selectedIndex,
             selectedItemColor: AppColors.primary,
-            items: [
+            items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.wechat_outlined),
                 label: "Chats",

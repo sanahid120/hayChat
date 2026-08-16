@@ -18,6 +18,7 @@ class SignInProvider extends ChangeNotifier {
     _signInProgress = true;
     notifyListeners();
 
+
     try {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
