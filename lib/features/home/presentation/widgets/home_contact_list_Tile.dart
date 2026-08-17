@@ -25,7 +25,9 @@ class HomeContactTile extends StatelessWidget {
     final diff = now.difference(date);
 
     if (diff.inDays == 0) {
-      final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+      final hour = date.hour > 12
+          ? date.hour - 12
+          : (date.hour == 0 ? 12 : date.hour);
       final period = date.hour >= 12 ? 'PM' : 'AM';
       final minute = date.minute.toString().padLeft(2, '0');
       return '$hour:$minute $period';
@@ -43,26 +45,31 @@ class HomeContactTile extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: CircleAvatar(
         radius: 28,
-        backgroundImage: (user.profilePicture != null && 
-                          user.profilePicture != 'null currently' && 
-                          user.profilePicture!.startsWith('http'))
-            ? NetworkImage(user.profilePicture!)
-            : const AssetImage(AssetPaths.illustration) as ImageProvider,
+        backgroundImage: user.profilePicture !=null && user.profilePicture!.startsWith('https')
+            ? Image.network(
+                user.profilePicture!,
+                fit: BoxFit.cover,
+                cacheHeight: 100,
+                cacheWidth: 100,
+              ).image
+            : AssetImage(AssetPaths.illustration),
       ),
       title: Text(
         user.name ?? "User",
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         lastMessage ?? user.email,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: lastMessage != null ? AppColors.textSecondary : AppColors.textHint,
-            ),
+          color: lastMessage != null
+              ? AppColors.textSecondary
+              : AppColors.textHint,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -72,9 +79,9 @@ class HomeContactTile extends StatelessWidget {
         children: [
           Text(
             _formatTimestamp(timestamp),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.textHint,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: AppColors.textHint),
           ),
           const SizedBox(height: 4),
         ],

@@ -51,9 +51,12 @@ class _ContactScreenState extends State<ContactScreen> {
           .where('email', isEqualTo: query)
           .get();
 
-      final results = querySnapshot.docs.map((doc) {
-        return UserModel.fromJson(doc.data(), doc.id);
-      }).where((user) => user.uid != _currentUid).toList();
+      final results = querySnapshot.docs
+          .map((doc) {
+            return UserModel.fromJson(doc.data(), doc.id);
+          })
+          .where((user) => user.uid != _currentUid)
+          .toList();
 
       setState(() {
         _searchResults = results;
@@ -80,9 +83,9 @@ class _ContactScreenState extends State<ContactScreen> {
         title: Text(
           "Contacts",
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: AppColors.background,
         actions: [
@@ -116,7 +119,10 @@ class _ContactScreenState extends State<ContactScreen> {
                 hintText: 'Search by email...',
                 prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.arrow_forward, color: AppColors.primary),
+                  icon: const Icon(
+                    Icons.arrow_forward,
+                    color: AppColors.primary,
+                  ),
                   onPressed: () => _searchUser(searchController.text),
                 ),
                 filled: true,
@@ -138,24 +144,24 @@ class _ContactScreenState extends State<ContactScreen> {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
-        child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          _error!,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: _searchResults.length,
-      separatorBuilder: (context, index) => const Divider(color: AppColors.divider, indent: 80),
+      separatorBuilder: (context, index) =>
+          const Divider(color: AppColors.divider, indent: 80),
       itemBuilder: (context, index) {
         final user = _searchResults[index];
         return HomepageContactsCard(
           user: user,
           onTap: () {
-            Navigator.pushNamed(
-              context,
-              ChatScreen.routeName,
-              arguments: user,
-            );
+            Navigator.pushNamed(context, ChatScreen.routeName, arguments: user);
           },
         );
       },
@@ -180,7 +186,11 @@ class _ContactScreenState extends State<ContactScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.people_outline, size: 80, color: AppColors.textHint),
+                const Icon(
+                  Icons.people_outline,
+                  size: 80,
+                  color: AppColors.textHint,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   "No contacts yet",
@@ -206,12 +216,13 @@ class _ContactScreenState extends State<ContactScreen> {
         return ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 16),
           itemCount: conversations.length,
-          separatorBuilder: (context, index) => const Divider(color: AppColors.divider, indent: 80),
+          separatorBuilder: (context, index) =>
+              const Divider(color: AppColors.divider, indent: 80),
           itemBuilder: (context, index) {
             final data = conversations[index].data() as Map<String, dynamic>;
             final user = UserModel(
               uid: data['otherUserUid'],
-              name: data['otherUserName'] ?? 'User',
+              name: data['otherUserName'] ?? 'Guest Name',
               email: data['otherUserEmail'] ?? '',
               profilePicture: data['otherUserProfile'],
             );

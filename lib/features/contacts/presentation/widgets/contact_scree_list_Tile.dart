@@ -44,8 +44,8 @@ class HomepageContactsCard extends StatelessWidget {
         backgroundImage: (user.profilePicture != null && 
                           user.profilePicture != 'null currently' && 
                           user.profilePicture!.startsWith('http'))
-            ? NetworkImage(user.profilePicture!)
-            : const AssetImage(AssetPaths.illustration) as ImageProvider,
+            ? Image.network(user.profilePicture!).image
+            : AssetImage(AssetPaths.illustration) ,
       ),
       title: Text(
         user.name ?? "No Name",

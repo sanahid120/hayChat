@@ -4,11 +4,7 @@ import '../../../../app/asset_paths.dart';
 import '../../../../app/models/user_model.dart';
 
 class AppBarWidget extends StatelessWidget {
-  const AppBarWidget({
-    super.key,
-    required this.onTap,
-    this.user,
-  });
+  const AppBarWidget({super.key, required this.onTap, this.user});
 
   final VoidCallback onTap;
   final UserModel? user;
@@ -21,9 +17,15 @@ class AppBarWidget extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundImage: (user?.profilePicture != null && user?.profilePicture != 'null currently')
-                ? NetworkImage(user!.profilePicture!)
-                : const AssetImage(AssetPaths.illustration) as ImageProvider,
+            backgroundImage:
+                user?.profilePicture != null &&
+                    user!.profilePicture!.startsWith('https')
+                ? Image.network(
+                    user!.profilePicture!,
+                    cacheHeight: 100,
+                    cacheWidth: 100,
+                  ).image
+                : AssetImage(AssetPaths.illustration),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -34,16 +36,16 @@ class AppBarWidget extends StatelessWidget {
                 Text(
                   user?.name ?? "Chat",
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    color: AppColors.textPrimary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   "Online",
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.online,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    color: AppColors.online,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),

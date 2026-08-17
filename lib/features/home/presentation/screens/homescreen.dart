@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
+import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
 import '../../../../auth/presentation/screens/sign_in_screen.dart';
@@ -34,9 +36,9 @@ class _HomescreenState extends State<Homescreen> {
         title: Text(
           AppStrings.appName,
           style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: AppColors.background,
         actions: [
@@ -79,6 +81,7 @@ class _HomescreenState extends State<Homescreen> {
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
+
           if (snapshot.hasError) {
             return Center(
               child: Text(
@@ -97,7 +100,11 @@ class _HomescreenState extends State<Homescreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.chat_bubble_outline, size: 80, color: AppColors.textHint),
+                  const Icon(
+                    Icons.chat_bubble_outline,
+                    size: 80,
+                    color: AppColors.textHint,
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     "No conversations yet",
@@ -105,10 +112,10 @@ class _HomescreenState extends State<Homescreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      // Logic to navigate to contact search can be added here
+                      context.read<HomepageMainNavProvider>().moveToContacts();
                     },
                     child: const Text("Start chatting"),
-                  )
+                  ),
                 ],
               ),
             );
@@ -119,17 +126,14 @@ class _HomescreenState extends State<Homescreen> {
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: conversations.length,
-            separatorBuilder: (context, index) => const Divider(
-              color: AppColors.divider,
-              indent: 80,
-              height: 1,
-            ),
+            separatorBuilder: (context, index) =>
+                const Divider(color: AppColors.divider, indent: 80, height: 1),
             itemBuilder: (context, index) {
               final data = conversations[index].data() as Map<String, dynamic>;
               final user = UserModel(
                 uid: data['otherUserUid'],
-                name: data['otherUserName'] ?? 'User',
-                email: data['otherUserEmail'] ?? '',
+                name: data['otherUserName'] ,
+                email: data['otherUserEmail'] ,
                 profilePicture: data['otherUserProfile'],
               );
 

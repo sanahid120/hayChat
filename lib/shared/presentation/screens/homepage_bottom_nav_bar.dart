@@ -16,12 +16,15 @@ class HomepageBottomNavBar extends StatefulWidget {
 }
 
 class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
+
   @override
   Widget build(BuildContext context) {
     return Consumer<HomepageMainNavProvider>(
       builder: (context, mainNavProvider, _) {
         return Scaffold(
           extendBody: false,
+
+
           body: IndexedStack(
             index: mainNavProvider.selectedIndex,
             children: const [
@@ -34,6 +37,7 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
             onTap: (int index) {
               mainNavProvider.updateIndex(index);
             },
+
             unselectedItemColor: Colors.grey,
             showUnselectedLabels: true,
             backgroundColor: AppColors.scaffoldBackground,
@@ -41,6 +45,7 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
             currentIndex: mainNavProvider.selectedIndex,
             selectedItemColor: AppColors.primary,
             items: const [
+
               BottomNavigationBarItem(
                 icon: Icon(Icons.wechat_outlined),
                 label: "Chats",
