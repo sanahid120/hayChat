@@ -8,6 +8,17 @@ class AppBarWidget extends StatelessWidget {
 
   final VoidCallback onTap;
   final UserModel? user;
+  ImageProvider _getProfileImage() {
+
+    if (user?.profilePicture != null &&
+        user!.profilePicture!.startsWith('https')) {
+      return NetworkImage(
+        user!.profilePicture!,
+      );
+    } else {
+      return const AssetImage(AssetPaths.illustration);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,15 +28,8 @@ class AppBarWidget extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundImage:
-                user?.profilePicture != null &&
-                    user!.profilePicture!.startsWith('https')
-                ? Image.network(
-                    user!.profilePicture!,
-                    cacheHeight: 100,
-                    cacheWidth: 100,
-                  ).image
-                : AssetImage(AssetPaths.illustration),
+            backgroundImage: _getProfileImage(),
+
           ),
           const SizedBox(width: 12),
           Expanded(

@@ -141,6 +141,10 @@ class _HomescreenState extends State<Homescreen> {
                 user: user,
                 lastMessage: data['lastMessage'],
                 timestamp: data['timestamp'] as Timestamp?,
+                isSeen: data['isSeen'] ?? false,
+                isReceived: data['isReceived'] ?? false,
+                lastMessageSenderId: data['lastMessageSenderId'],
+                unreadCount: data['unreadCount'] ?? 0,
                 onTap: () {
                   Navigator.pushNamed(
                     context,

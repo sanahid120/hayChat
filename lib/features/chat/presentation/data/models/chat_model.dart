@@ -6,6 +6,8 @@ class ChatModel {
   final String type;
   final String receiver;
   final DateTime? dateTimestamp;
+  final bool isSeen;
+  final bool isReceived;
 
   ChatModel({
     required this.sender,
@@ -13,6 +15,8 @@ class ChatModel {
     required this.type,
     required this.receiver,
     this.dateTimestamp,
+    this.isSeen = false,
+    this.isReceived = false,
   });
 
   bool isSentBy(String uid) => sender == uid;
@@ -24,6 +28,8 @@ class ChatModel {
       type: map['type'] ?? 'text',
       receiver: map['receiver'] ?? '',
       dateTimestamp: (map['dateTimestamp'] as Timestamp?)?.toDate(),
+      isSeen: map['isSeen'] ?? false,
+      isReceived: map['isReceived'] ?? false,
     );
   }
 
@@ -34,6 +40,8 @@ class ChatModel {
       'type': type,
       'receiver': receiver,
       'dateTimestamp': dateTimestamp != null ? Timestamp.fromDate(dateTimestamp!) : FieldValue.serverTimestamp(),
+      'isSeen': isSeen,
+      'isReceived': isReceived,
     };
   }
 }
