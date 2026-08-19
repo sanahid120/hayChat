@@ -37,11 +37,8 @@ class _SignInScreenState extends State<SignInScreen> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      checkUser();
-    });
+    checkUser();
   }
 
   void checkUser() {

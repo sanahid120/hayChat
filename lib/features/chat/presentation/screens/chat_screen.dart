@@ -2,12 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_colors.dart';
-import 'package:hay_chat/app/methods/scaffold_message.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/data/models/chat_model.dart';
 import 'package:intl/intl.dart';
 
 import '../widgets/app_bar_widget.dart';
+import '../widgets/date_header_widget.dart';
 import '../widgets/message_input_area_widget.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -321,41 +321,3 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class DateHeaderWidget extends StatelessWidget {
-  final DateTime date;
-  const DateHeaderWidget({super.key, required this.date});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 18),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          _formatDate(date),
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    if (date.year == now.year && date.month == now.month && date.day == now.day) {
-      return 'Today';
-    }
-    final yesterday = now.subtract(const Duration(days: 1));
-    if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
-      return 'Yesterday';
-    }
-    return DateFormat('dd/MM/yyyy').format(date);
-  }
-}

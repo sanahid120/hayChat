@@ -2,9 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/models/user_model.dart';
+import 'package:provider/provider.dart';
 import '../../../../app/app_colors.dart';
 import '../../../../auth/presentation/screens/sign_in_screen.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
+import '../providers/contact_screen_provider.dart';
 import '../widgets/contact_scree_list_Tile.dart';
 
 class ContactScreen extends StatefulWidget {
@@ -16,63 +18,12 @@ class ContactScreen extends StatefulWidget {
 
 class _ContactScreenState extends State<ContactScreen> {
   final TextEditingController searchController = TextEditingController();
-  List<UserModel> _searchResults = [];
-  bool _isLoading = false;
-  bool _isSearching = false;
-  String? _error;
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void dispose() {
     searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _searchUser(String email) async {
-    final query = email.trim();
-    if (query.isEmpty) {
-      setState(() {
-        _isSearching = false;
-        _searchResults = [];
-        _error = null;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: query)
-          .get();
-
-      final results = querySnapshot.docs
-          .map((doc) {
-            return UserModel.fromJson(doc.data(), doc.id);
-          })
-          .where((user) => user.uid != _currentUid)
-          .toList();
-
-      setState(() {
-        _searchResults = results;
-        if (results.isEmpty) {
-          _error = "No user found with this email.";
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _error = "An error occurred during search.";
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -93,9 +44,6 @@ class _ContactScreenState extends State<ContactScreen> {
             onSelected: onMenuSelected,
             itemBuilder: (context) => [
               const PopupMenuItem(value: 1, child: Text('LogOut')),
-              const PopupMenuItem(value: 2, child: Text('New Secret Chat')),
-              const PopupMenuItem(value: 3, child: Text('Linked Devices')),
-              const PopupMenuItem(value: 4, child: Text('Settings')),
             ],
           ),
         ],
@@ -107,14 +55,12 @@ class _ContactScreenState extends State<ContactScreen> {
               controller: searchController,
               style: const TextStyle(color: AppColors.textPrimary),
               onChanged: (value) {
-                if (value.isEmpty && _isSearching) {
-                  setState(() {
-                    _isSearching = false;
-                    _error = null;
-                  });
+                if (value.isEmpty) {
+                  context.read<ContactScreenProvider>().searchEmail("");
                 }
               },
-              onSubmitted: _searchUser,
+              onSubmitted: (value) =>
+                  context.read<ContactScreenProvider>().searchEmail(value),
               decoration: InputDecoration(
                 hintText: 'Search by email...',
                 prefixIcon: const Icon(Icons.search, color: AppColors.primary),
@@ -123,7 +69,9 @@ class _ContactScreenState extends State<ContactScreen> {
                     Icons.arrow_forward,
                     color: AppColors.primary,
                   ),
-                  onPressed: () => _searchUser(searchController.text),
+                  onPressed: () => context
+                      .read<ContactScreenProvider>()
+                      .searchEmail(searchController.text),
                 ),
                 filled: true,
                 fillColor: AppColors.inputBackground,
@@ -136,28 +84,48 @@ class _ContactScreenState extends State<ContactScreen> {
           ),
         ),
       ),
-      body: _isSearching ? _buildSearchResults() : _buildRecentContacts(),
+      body: Consumer<ContactScreenProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (searchController.text.isNotEmpty ||
+              provider.searchResults.isNotEmpty) {
+            return _buildSearchResults(provider);
+          }
+
+          return _buildRecentContacts();
+        },
+      ),
     );
   }
 
-  Widget _buildSearchResults() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
+  Widget _buildSearchResults(ContactScreenProvider provider) {
+    if (provider.error != null) {
       return Center(
         child: Text(
-          _error!,
+          provider.error!,
           style: const TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+    if (provider.searchResults.isEmpty) {
+      return const Center(
+        child: Text(
+          "No users found",
+          style: TextStyle(color: AppColors.textSecondary),
         ),
       );
     }
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      itemCount: _searchResults.length,
+      itemCount: provider.searchResults.length,
       separatorBuilder: (context, index) =>
           const Divider(color: AppColors.divider, indent: 80),
       itemBuilder: (context, index) {
-        final user = _searchResults[index];
+        final user = provider.searchResults[index];
         return HomepageContactsCard(
           user: user,
           onTap: () {
@@ -220,21 +188,40 @@ class _ContactScreenState extends State<ContactScreen> {
               const Divider(color: AppColors.divider, indent: 80),
           itemBuilder: (context, index) {
             final data = conversations[index].data() as Map<String, dynamic>;
-            final user = UserModel(
-              uid: data['otherUserUid'],
-              name: data['otherUserName'] ?? 'Guest Name',
-              email: data['otherUserEmail'] ?? '',
-              profilePicture: data['otherUserProfile'],
-            );
+            final userId = data['otherUserUid'] as String;
 
-            return HomepageContactsCard(
-              user: user,
-              timestamp: data['timestamp'] as Timestamp?,
-              onTap: () {
-                Navigator.pushNamed(
-                  context,
-                  ChatScreen.routeName,
-                  arguments: user,
+            return StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .snapshots(),
+              builder: (context, userSnapshot) {
+                UserModel user;
+                if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                  user = UserModel.fromJson(
+                    userSnapshot.data!.data() as Map<String, dynamic>,
+                    userId,
+                  );
+                } else {
+                  // Fallback to metadata if live data is not yet available
+                  user = UserModel(
+                    uid: userId,
+                    name: data['otherUserName'] ?? 'User',
+                    email: data['otherUserEmail'] ?? '',
+                    profilePicture: data['otherUserProfile'],
+                  );
+                }
+
+                return HomepageContactsCard(
+                  user: user,
+                  timestamp: data['timestamp'] as Timestamp?,
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      ChatScreen.routeName,
+                      arguments: user,
+                    );
+                  },
                 );
               },
             );

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
-import 'package:hay_chat/auth/presentation/screens/intorduction.dart';
-import 'package:hay_chat/auth/presentation/screens/sign_in_screen.dart';
 import 'package:hay_chat/auth/presentation/screens/splash_screen.dart';
+import 'package:hay_chat/features/contacts/presentation/providers/contact_screen_provider.dart';
+import 'package:hay_chat/features/home/presentation/providers/homescreen_provider.dart';
 import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
-import 'package:hay_chat/shared/presentation/screens/homepage_bottom_nav_bar.dart';
 import 'package:provider/provider.dart';
 
 import '../auth/presentation/providers/sign_in_provider.dart';
@@ -22,6 +21,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HomepageMainNavProvider()),
         ChangeNotifierProvider(create: (_) => SignInProvider()),
         ChangeNotifierProvider(create: (_) => SignUpProvider()),
+        ChangeNotifierProvider(create: (_) => HomescreenProvider()),
+        ChangeNotifierProvider(create: (_) => ContactScreenProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

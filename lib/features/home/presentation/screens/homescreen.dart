@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
-import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
 import '../../../../auth/presentation/screens/sign_in_screen.dart';
+import '../providers/homescreen_provider.dart';
 import '../widgets/home_contact_list_Tile.dart';
+import '../widgets/no_conversation_screen_widget.dart';
 
 class Homescreen extends StatefulWidget {
   const Homescreen({super.key});
@@ -21,6 +22,14 @@ class Homescreen extends StatefulWidget {
 class _HomescreenState extends State<Homescreen> {
   final TextEditingController searchController = TextEditingController();
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomescreenProvider>().listenToConversations(_currentUid);
+    });
+  }
 
   @override
   void dispose() {
@@ -46,9 +55,6 @@ class _HomescreenState extends State<Homescreen> {
             onSelected: onMenuSelected,
             itemBuilder: (context) => [
               const PopupMenuItem(value: 1, child: Text('LogOut')),
-              const PopupMenuItem(value: 2, child: Text('New Secret Chat')),
-              const PopupMenuItem(value: 3, child: Text('Linked Devices')),
-              const PopupMenuItem(value: 4, child: Text('Settings')),
             ],
           ),
         ],
@@ -73,83 +79,65 @@ class _HomescreenState extends State<Homescreen> {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('conversation')
-            .doc(_currentUid)
-            .collection('messages')
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
+      body: Consumer<HomescreenProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          if (snapshot.hasError) {
+          if (provider.errorMessage != null) {
             return Center(
               child: Text(
-                "Error loading chats: ${snapshot.error}",
+                provider.errorMessage!,
                 style: const TextStyle(color: AppColors.error),
               ),
             );
           }
 
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+          if (provider.conversations.isEmpty) {
+            return const NoConversationWidget();
           }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    size: 80,
-                    color: AppColors.textHint,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "No conversations yet",
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      context.read<HomepageMainNavProvider>().moveToContacts();
-                    },
-                    child: const Text("Start chatting"),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final conversations = snapshot.data!.docs;
 
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: conversations.length,
+            itemCount: provider.conversations.length,
             separatorBuilder: (context, index) =>
                 const Divider(color: AppColors.divider, indent: 80, height: 1),
             itemBuilder: (context, index) {
-              final data = conversations[index].data() as Map<String, dynamic>;
-              final user = UserModel(
-                uid: data['otherUserUid'],
-                name: data['otherUserName'] ,
-                email: data['otherUserEmail'] ,
-                profilePicture: data['otherUserProfile'],
-              );
+              final data = provider.conversations[index].data() as Map<String, dynamic>;
+              final otherUserId = data['otherUserUid'] as String;
 
-              return HomeContactTile(
-                user: user,
-                lastMessage: data['lastMessage'],
-                timestamp: data['timestamp'] as Timestamp?,
-                isSeen: data['isSeen'] ?? false,
-                isReceived: data['isReceived'] ?? false,
-                lastMessageSenderId: data['lastMessageSenderId'],
-                unreadCount: data['unreadCount'] ?? 0,
-                onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    ChatScreen.routeName,
-                    arguments: user,
+              return StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('users').doc(otherUserId).snapshots(),
+                builder: (context, userSnapshot) {
+                  UserModel user;
+                  if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                    user = UserModel.fromJson(userSnapshot.data!.data() as Map<String, dynamic>, otherUserId);
+                  } else {
+                    // Fallback to metadata from conversation if live doc isn't loaded yet
+                    user = UserModel(
+                      uid: otherUserId,
+                      name: data['otherUserName'] ?? 'User',
+                      email: data['otherUserEmail'] ?? '',
+                      profilePicture: data['otherUserProfile'],
+                    );
+                  }
+
+                  return HomeContactTile(
+                    user: user,
+                    lastMessage: data['lastMessage'],
+                    timestamp: data['timestamp'] as Timestamp?,
+                    isSeen: data['isSeen'] ?? false,
+                    isReceived: data['isReceived'] ?? false,
+                    lastMessageSenderId: data['lastMessageSenderId'],
+                    unreadCount: data['unreadCount'] ?? 0,
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        ChatScreen.routeName,
+                        arguments: user,
+                      );
+                    },
                   );
                 },
               );
