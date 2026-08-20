@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 
 class HomescreenProvider extends ChangeNotifier {
   List<QueryDocumentSnapshot> _conversations = [];
+  List<QueryDocumentSnapshot> _filteredConversations = [];
   bool _isLoading = true;
   String? _errorMessage;
   StreamSubscription<QuerySnapshot>? _subscription;
+  String _searchQuery = '';
 
-  List<QueryDocumentSnapshot> get conversations => _conversations;
+  List<QueryDocumentSnapshot> get conversations => 
+      _searchQuery.isEmpty ? _conversations : _filteredConversations;
+  
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -32,6 +36,7 @@ class HomescreenProvider extends ChangeNotifier {
         .listen(
       (snapshot) {
         _conversations = snapshot.docs;
+        _applySearch();
         _isLoading = false;
         _errorMessage = null;
         notifyListeners();
@@ -40,9 +45,29 @@ class HomescreenProvider extends ChangeNotifier {
         _errorMessage = error.toString();
         _isLoading = false;
         _conversations = [];
+        _filteredConversations = [];
         notifyListeners();
       },
     );
+  }
+
+  void searchConversations(String query) {
+    _searchQuery = query.trim().toLowerCase();
+    _applySearch();
+    notifyListeners();
+  }
+
+  void _applySearch() {
+    if (_searchQuery.isEmpty) {
+      _filteredConversations = [];
+    } else {
+      _filteredConversations = _conversations.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final otherUserName = (data['otherUserName'] ?? '').toString().toLowerCase();
+        final lastMessage = (data['lastMessage'] ?? '').toString().toLowerCase();
+        return otherUserName.contains(_searchQuery) || lastMessage.contains(_searchQuery);
+      }).toList();
+    }
   }
 
   @override

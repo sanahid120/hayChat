@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/app_colors.dart';
 import '../../../../app/methods/scaffold_message.dart';
-import '../../../../shared/presentation/data/nav_bar_provider.dart';
 
 class NoConversationWidget extends StatelessWidget {
   const NoConversationWidget({

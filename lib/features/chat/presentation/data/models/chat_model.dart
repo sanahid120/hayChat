@@ -22,12 +22,14 @@ class ChatModel {
   bool isSentBy(String uid) => sender == uid;
 
   factory ChatModel.fromMap(Map<String, dynamic> map) {
+    final timestamp = map['dateTimestamp'] as Timestamp?;
+    final clientTimestamp = map['clientTimestamp'] as Timestamp?;
     return ChatModel(
       sender: map['sender'] ?? '',
       message: map['message'] ?? '',
       type: map['type'] ?? 'text',
       receiver: map['receiver'] ?? '',
-      dateTimestamp: (map['dateTimestamp'] as Timestamp?)?.toDate(),
+      dateTimestamp: (timestamp ?? clientTimestamp)?.toDate(),
       isSeen: map['isSeen'] ?? false,
       isReceived: map['isReceived'] ?? false,
     );
@@ -39,14 +41,16 @@ class ChatModel {
       'message': message,
       'type': type,
       'receiver': receiver,
-      'dateTimestamp': dateTimestamp != null ? Timestamp.fromDate(dateTimestamp!) : FieldValue.serverTimestamp(),
+      'dateTimestamp': dateTimestamp != null
+          ? Timestamp.fromDate(dateTimestamp!)
+          : FieldValue.serverTimestamp(),
+      'clientTimestamp': dateTimestamp != null
+          ? Timestamp.fromDate(dateTimestamp!)
+          : FieldValue.serverTimestamp(),
       'isSeen': isSeen,
       'isReceived': isReceived,
     };
   }
 }
 
-enum MessageType {
-  text,
-  image,
-}
+enum MessageType { text, image }

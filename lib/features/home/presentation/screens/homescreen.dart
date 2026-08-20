@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
+import 'package:hay_chat/features/chat/presentation/providers/chat_provider.dart';
+import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
@@ -28,6 +30,7 @@ class _HomescreenState extends State<Homescreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomescreenProvider>().listenToConversations(_currentUid);
+      context.read<ChatProvider>().startGlobalMessageListener();
     });
   }
 
@@ -64,6 +67,9 @@ class _HomescreenState extends State<Homescreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
               controller: searchController,
+              onChanged: (value) {
+                context.read<HomescreenProvider>().searchConversations(value);
+              },
               style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search Conversation',
@@ -114,7 +120,6 @@ class _HomescreenState extends State<Homescreen> {
                   if (userSnapshot.hasData && userSnapshot.data!.exists) {
                     user = UserModel.fromJson(userSnapshot.data!.data() as Map<String, dynamic>, otherUserId);
                   } else {
-                    // Fallback to metadata from conversation if live doc isn't loaded yet
                     user = UserModel(
                       uid: otherUserId,
                       name: data['otherUserName'] ?? 'User',
@@ -131,7 +136,11 @@ class _HomescreenState extends State<Homescreen> {
                     isReceived: data['isReceived'] ?? false,
                     lastMessageSenderId: data['lastMessageSenderId'],
                     unreadCount: data['unreadCount'] ?? 0,
-                    onTap: () {
+                    onTap: () async {
+                      await context
+                          .read<ChatProvider>()
+                          .markMessagesAsSeen(otherUserId);
+                      if (!context.mounted) return;
                       Navigator.pushNamed(
                         context,
                         ChatScreen.routeName,

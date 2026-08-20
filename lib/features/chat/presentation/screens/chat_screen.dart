@@ -5,7 +5,9 @@ import 'package:hay_chat/app/app_colors.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:hay_chat/features/chat/presentation/data/models/chat_model.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/chat_provider.dart';
 import '../widgets/app_bar_widget.dart';
 import '../widgets/date_header_widget.dart';
 import '../widgets/message_input_area_widget.dart';
@@ -15,7 +17,7 @@ class ChatScreen extends StatefulWidget {
 
   const ChatScreen({super.key, this.receiverUser});
 
-  static const String routeName = "/ChatScreen";
+  static const String routeName = '/ChatScreen';
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -25,80 +27,49 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  String? _currentUserName;
+  late final ChatProvider _chatProvider;
+  String? _lastRenderedMessageId;
+  String? _lastSeenMessageId;
+  bool _hasRenderedMessages = false;
+  bool _scrollScheduled = false;
+  bool _seenMarkScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchCurrentUserName();
+    _chatProvider = context.read<ChatProvider>();
+    _chatProvider.setActiveChatUser(widget.receiverUser?.uid);
+    _chatProvider.fetchCurrentUserName();
     _markMessagesAsSeen();
   }
 
-  Future<void> _fetchCurrentUserName() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUid)
-          .get();
-      if (doc.exists && mounted) {
-        setState(() {
-          _currentUserName = doc.data()?['name'];
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching current user name: $e");
-    }
-  }
-
-  /// Marks incoming messages as seen so the sender gets the blue ticks
   Future<void> _markMessagesAsSeen() async {
     final receiverUid = widget.receiverUser?.uid;
-    if (receiverUid == null) return;
+    if (receiverUid == null || receiverUid.isEmpty) return;
 
-    try {
-      final batch = FirebaseFirestore.instance.batch();
+    await _chatProvider.markMessagesAsSeen(receiverUid);
+  }
 
-      // 1. Reset my local unread count metadata
-      final myMetaRef = FirebaseFirestore.instance
-          .collection('conversation')
-          .doc(_currentUid)
-          .collection('messages')
-          .doc(receiverUid);
-      batch.set(myMetaRef, {'unreadCount': 0, 'isSeen': true}, SetOptions(merge: true));
-
-      // 2. Mark "isSeen" in the OTHER person's collection (so THEY see blue ticks)
-      final otherMessagesQuery = await FirebaseFirestore.instance
-          .collection('conversation')
-          .doc(receiverUid)
-          .collection('messages')
-          .doc(_currentUid)
-          .collection('chats')
-          .where('sender', isEqualTo: receiverUid)
-          .where('isSeen', isEqualTo: false)
-          .get();
-
-      if (otherMessagesQuery.docs.isNotEmpty) {
-        for (var doc in otherMessagesQuery.docs) {
-          batch.update(doc.reference, {'isSeen': true, 'isReceived': true});
-        }
-        
-        // 3. Update the metadata for the sender as well
-        final senderMetaRef = FirebaseFirestore.instance
-            .collection('conversation')
-            .doc(receiverUid)
-            .collection('messages')
-            .doc(_currentUid);
-        batch.set(senderMetaRef, {'isSeen': true, 'isReceived': true}, SetOptions(merge: true));
-      }
-
-      await batch.commit();
-    } catch (e) {
-      debugPrint("Error marking messages as seen: $e");
+  void _markNewMessagesAsSeen(String? latestMessageId, String? senderId) {
+    if (latestMessageId == null ||
+        latestMessageId == _lastSeenMessageId ||
+        senderId == _currentUid ||
+        _seenMarkScheduled) {
+      return;
     }
+
+    _lastSeenMessageId = latestMessageId;
+    _seenMarkScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _seenMarkScheduled = false;
+      if (!mounted) return;
+      await _markMessagesAsSeen();
+    });
   }
 
   @override
   void dispose() {
+    _chatProvider.setActiveChatUser(null);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -106,99 +77,81 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
     final receiverUid = widget.receiverUser?.uid;
-    if (receiverUid == null) return;
+    if (text.isEmpty || receiverUid == null || receiverUid.isEmpty) return;
 
-    try {
-      // Use a consistent ID for both copies
-      final String msgId = DateTime.now().millisecondsSinceEpoch.toString() + _currentUid.substring(0, 3);
+    _messageController.clear();
 
-      final chatMessage = ChatModel(
-        sender: _currentUid,
-        receiver: receiverUid,
-        message: text,
-        type: MessageType.text.name,
-        dateTimestamp: DateTime.now(),
-        isSeen: false,
-        isReceived: true,
-      );
+    await _chatProvider.sendMessage(
+      receiverUid: receiverUid,
+      text: text,
+      receiverName: widget.receiverUser?.name ?? 'User',
+      receiverProfile: widget.receiverUser?.profilePicture,
+      receiverEmail: widget.receiverUser?.email,
+    );
 
-      _messageController.clear();
-      final batch = FirebaseFirestore.instance.batch();
-
-      final senderChatRef = FirebaseFirestore.instance
-          .collection('conversation')
-          .doc(_currentUid)
-          .collection('messages')
-          .doc(receiverUid)
-          .collection('chats')
-          .doc(msgId);
-
-      final receiverChatRef = FirebaseFirestore.instance
-          .collection('conversation')
-          .doc(receiverUid)
-          .collection('messages')
-          .doc(_currentUid)
-          .collection('chats')
-          .doc(msgId);
-
-      batch.set(senderChatRef, chatMessage.toMap());
-      batch.set(receiverChatRef, chatMessage.toMap());
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-
-      final metaDataSender = {
-        'lastMessage': text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'otherUserUid': receiverUid,
-        'otherUserName': widget.receiverUser?.name ?? 'User',
-        'otherUserProfile': widget.receiverUser?.profilePicture,
-        'lastMessageSenderId': _currentUid,
-        'isSeen': false,
-        'isReceived': true,
-      };
-
-      final metaDataReceiver = {
-        'lastMessage': text,
-        'timestamp': FieldValue.serverTimestamp(),
-        'otherUserUid': _currentUid,
-        'otherUserName': _currentUserName ?? currentUser?.displayName ?? 'User',
-        'otherUserProfile': currentUser?.photoURL,
-        'lastMessageSenderId': _currentUid,
-        'isSeen': false,
-        'isReceived': true,
-        'unreadCount': FieldValue.increment(1),
-      };
-
-      batch.set(senderChatRef.parent.parent!, metaDataSender, SetOptions(merge: true));
-      batch.set(receiverChatRef.parent.parent!, metaDataReceiver, SetOptions(merge: true));
-
-      await batch.commit();
-      _scrollToBottom();
-    } catch (e) {
-      debugPrint("Send error: $e");
-    }
+    _scrollToBottom();
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
+  void _scrollToBottom({bool force = false}) {
+    if (_scrollScheduled) return;
+    if (!force) {
+      if (!_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if (position.maxScrollExtent - position.pixels > 160) return;
+    }
+
+    _scrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollScheduled = false;
+      if (!mounted || !_scrollController.hasClients) return;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll <= 0) return;
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent + 200,
-        duration: const Duration(milliseconds: 300),
+        maxScroll,
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
-    }
+    });
+  }
+
+  int _compareMessageDocs(
+    QueryDocumentSnapshot<Object?> left,
+    QueryDocumentSnapshot<Object?> right,
+  ) {
+    final leftData = left.data() as Map<String, dynamic>;
+    final rightData = right.data() as Map<String, dynamic>;
+    final leftTimestamp =
+        leftData['dateTimestamp'] ?? leftData['clientTimestamp'];
+    final rightTimestamp =
+        rightData['dateTimestamp'] ?? rightData['clientTimestamp'];
+    final leftMillis = leftTimestamp is Timestamp
+        ? leftTimestamp.millisecondsSinceEpoch
+        : -1;
+    final rightMillis = rightTimestamp is Timestamp
+        ? rightTimestamp.millisecondsSinceEpoch
+        : -1;
+    final timestampComparison = leftMillis.compareTo(rightMillis);
+    return timestampComparison == 0
+        ? left.id.compareTo(right.id)
+        : timestampComparison;
   }
 
   String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return "";
+    if (dateTime == null) return '';
     return DateFormat('hh:mm a').format(dateTime);
   }
 
   @override
   Widget build(BuildContext context) {
+    final receiverUid = widget.receiverUser?.uid;
+
+    if (receiverUid == null || receiverUid.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text('Chat user not available.')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -209,31 +162,44 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('conversation')
-                  .doc(_currentUid)
-                  .collection('messages')
-                  .doc(widget.receiverUser!.uid)
-                  .collection('chats')
-                  .orderBy('dateTimestamp', descending: false)
-                  .snapshots(),
+              stream: _chatProvider.getChatStream(receiverUid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                  final lastDocData = snapshot.data!.docs.last.data() as Map<String, dynamic>;
-                  if (lastDocData['sender'] != _currentUid && lastDocData['isSeen'] == false) {
-                    _markMessagesAsSeen();
-                  }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Unable to load messages: ${snapshot.error}'),
+                  );
                 }
 
-                final messages = snapshot.data!.docs
-                    .map((doc) => ChatModel.fromMap(doc.data() as Map<String, dynamic>))
+                final messageDocs = snapshot.data?.docs.toList() ?? [];
+                messageDocs.sort(_compareMessageDocs);
+                final messages = messageDocs
+                    .map(
+                      (doc) =>
+                          ChatModel.fromMap(doc.data() as Map<String, dynamic>),
+                    )
                     .toList();
 
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+                final lastMessageId = messageDocs.isEmpty
+                    ? null
+                    : messageDocs.last.id;
+                final latestMessage = messages.isEmpty ? null : messages.last;
+                _markNewMessagesAsSeen(
+                  lastMessageId,
+                  latestMessage?.sender,
+                );
+                if (lastMessageId != _lastRenderedMessageId) {
+                  _lastRenderedMessageId = lastMessageId;
+                  _scrollToBottom(force: !_hasRenderedMessages);
+                  _hasRenderedMessages = true;
+                }
+
+                if (messages.isEmpty) {
+                  return const Center(child: Text('No messages yet'));
+                }
 
                 return ListView.builder(
                   controller: _scrollController,
@@ -247,10 +213,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       showDateHeader = true;
                     } else {
                       final prevMsg = messages[index - 1];
-                      if (msg.dateTimestamp != null && prevMsg.dateTimestamp != null) {
-                        if (msg.dateTimestamp!.day != prevMsg.dateTimestamp!.day ||
-                            msg.dateTimestamp!.month != prevMsg.dateTimestamp!.month ||
-                            msg.dateTimestamp!.year != prevMsg.dateTimestamp!.year) {
+                      if (msg.dateTimestamp != null &&
+                          prevMsg.dateTimestamp != null) {
+                        if (msg.dateTimestamp!.day !=
+                                prevMsg.dateTimestamp!.day ||
+                            msg.dateTimestamp!.month !=
+                                prevMsg.dateTimestamp!.month ||
+                            msg.dateTimestamp!.year !=
+                                prevMsg.dateTimestamp!.year) {
                           showDateHeader = true;
                         }
                       }
@@ -281,7 +251,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         padding: const EdgeInsets.only(left: 14, right: 14, top: 10, bottom: 6),
         decoration: BoxDecoration(
@@ -297,21 +269,34 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(msg.message, style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+            Text(
+              msg.message,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+              ),
+            ),
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_formatTime(msg.dateTimestamp),
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                Text(
+                  _formatTime(msg.dateTimestamp),
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
                 if (isMe) ...[
                   const SizedBox(width: 4),
                   Icon(
-                    msg.isSeen ? Icons.done_all : (msg.isReceived ? Icons.done_all : Icons.done),
+                    msg.isSeen
+                        ? Icons.done_all
+                        : (msg.isReceived ? Icons.done_all : Icons.done),
                     size: 14,
                     color: msg.isSeen ? Colors.blue : Colors.grey,
                   ),
-                ]
+                ],
               ],
             ),
           ],
@@ -320,4 +305,3 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
-

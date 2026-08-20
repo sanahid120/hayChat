@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../auth/presentation/providers/sign_in_provider.dart';
 import '../auth/presentation/providers/sign_up_provider.dart';
+import '../features/chat/presentation/providers/chat_provider.dart';
 import 'app_routes.dart';
 import 'app_themes.dart';
 
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SignUpProvider()),
         ChangeNotifierProvider(create: (_) => HomescreenProvider()),
         ChangeNotifierProvider(create: (_) => ContactScreenProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
