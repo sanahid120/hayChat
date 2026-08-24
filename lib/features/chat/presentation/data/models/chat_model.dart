@@ -1,56 +1,97 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum MessageType {
+  text,
+  image,
+  audio,
+  video,
+  file,
+}
+
 class ChatModel {
-  final String sender;
+  final String id;
+  final String senderId;
+  final String receiverId;
   final String message;
   final String type;
-  final String receiver;
-  final DateTime? dateTimestamp;
-  final bool isSeen;
-  final bool isReceived;
 
-  ChatModel({
-    required this.sender,
+  final DateTime? sentAt;
+  final DateTime? clientSentAt;
+  final DateTime? deliveredAt;
+  final DateTime? seenAt;
+
+  const ChatModel({
+    required this.id,
+    required this.senderId,
+    required this.receiverId,
     required this.message,
     required this.type,
-    required this.receiver,
-    this.dateTimestamp,
-    this.isSeen = false,
-    this.isReceived = false,
+    this.sentAt,
+    this.clientSentAt,
+    this.deliveredAt,
+    this.seenAt,
   });
 
-  bool isSentBy(String uid) => sender == uid;
+  bool isMine(String currentUserId) {
+    return senderId == currentUserId;
+  }
 
-  factory ChatModel.fromMap(Map<String, dynamic> map) {
-    final timestamp = map['dateTimestamp'] as Timestamp?;
-    final clientTimestamp = map['clientTimestamp'] as Timestamp?;
+  bool get isDelivered => deliveredAt != null;
+
+  bool get isSeen => seenAt != null;
+
+  DateTime? get displayTime => sentAt ?? clientSentAt;
+
+  factory ChatModel.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> document,
+      ) {
+    final data = document.data() ?? {};
+
     return ChatModel(
-      sender: map['sender'] ?? '',
-      message: map['message'] ?? '',
-      type: map['type'] ?? 'text',
-      receiver: map['receiver'] ?? '',
-      dateTimestamp: (timestamp ?? clientTimestamp)?.toDate(),
-      isSeen: map['isSeen'] ?? false,
-      isReceived: map['isReceived'] ?? false,
+      id: document.id,
+      senderId: data['senderId'] as String? ?? '',
+      receiverId: data['receiverId'] as String? ?? '',
+      message: data['message'] as String? ?? '',
+      type: data['type'] as String? ?? MessageType.text.name,
+      sentAt: _dateFromTimestamp(data['sentAt']),
+      clientSentAt: _dateFromTimestamp(data['clientSentAt']),
+      deliveredAt: _dateFromTimestamp(data['deliveredAt']),
+      seenAt: _dateFromTimestamp(data['seenAt']),
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toFirestore() {
     return {
-      'sender': sender,
+      'senderId': senderId,
+      'receiverId': receiverId,
       'message': message,
       'type': type,
-      'receiver': receiver,
-      'dateTimestamp': dateTimestamp != null
-          ? Timestamp.fromDate(dateTimestamp!)
-          : FieldValue.serverTimestamp(),
-      'clientTimestamp': dateTimestamp != null
-          ? Timestamp.fromDate(dateTimestamp!)
-          : FieldValue.serverTimestamp(),
-      'isSeen': isSeen,
-      'isReceived': isReceived,
+      'sentAt': FieldValue.serverTimestamp(),
+      'clientSentAt': clientSentAt == null
+          ? Timestamp.now()
+          : Timestamp.fromDate(clientSentAt!),
+      'deliveredAt': deliveredAt == null
+          ? null
+          : Timestamp.fromDate(deliveredAt!),
+      'seenAt': seenAt == null
+          ? null
+          : Timestamp.fromDate(seenAt!),
     };
   }
-}
 
-enum MessageType { text, image }
+  static DateTime? _dateFromTimestamp(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    return null;
+  }
+}

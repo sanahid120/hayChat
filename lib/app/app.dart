@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/auth/presentation/screens/splash_screen.dart';
+import 'package:hay_chat/auth/repository/chat_repository.dart';
 import 'package:hay_chat/features/contacts/presentation/providers/contact_screen_provider.dart';
 import 'package:hay_chat/features/home/presentation/providers/homescreen_provider.dart';
 import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
@@ -19,12 +20,38 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => HomepageMainNavProvider()),
-        ChangeNotifierProvider(create: (_) => SignInProvider()),
-        ChangeNotifierProvider(create: (_) => SignUpProvider()),
-        ChangeNotifierProvider(create: (_) => HomescreenProvider()),
-        ChangeNotifierProvider(create: (_) => ContactScreenProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
+
+        Provider<ChatRepository>(
+          create: (_) => ChatRepository(),
+        ),
+
+        ChangeNotifierProvider<HomepageMainNavProvider>(
+          create: (_) => HomepageMainNavProvider(),
+        ),
+
+        ChangeNotifierProvider<SignInProvider>(
+          create: (_) => SignInProvider(),
+        ),
+
+        ChangeNotifierProvider<SignUpProvider>(
+          create: (_) => SignUpProvider(),
+        ),
+
+        ChangeNotifierProvider<ChatProvider>(
+          create: (_) => ChatProvider(),
+        ),
+
+        ChangeNotifierProvider<HomescreenProvider>(
+          create: (context) => HomescreenProvider(
+            repository: context.read<ChatRepository>(),
+          ),
+        ),
+
+        ChangeNotifierProvider<ContactScreenProvider>(
+          create: (context) => ContactScreenProvider(
+            repository: context.read<ChatRepository>(),
+          ),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -32,7 +59,6 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,
-
         initialRoute: SplashScreen.routeName,
         onGenerateRoute: AppRoutes.onGenerateRoute,
       ),

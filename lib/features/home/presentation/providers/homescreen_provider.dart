@@ -1,77 +1,123 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:flutter/material.dart';
 
-class HomescreenProvider extends ChangeNotifier {
-  List<QueryDocumentSnapshot> _conversations = [];
-  List<QueryDocumentSnapshot> _filteredConversations = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-  StreamSubscription<QuerySnapshot>? _subscription;
-  String _searchQuery = '';
+import '../../../../auth/presentation/models/conversation_summary.dart';
+import '../../../../auth/repository/chat_repository.dart';
 
-  List<QueryDocumentSnapshot> get conversations => 
-      _searchQuery.isEmpty ? _conversations : _filteredConversations;
-  
+class HomescreenProvider extends ChangeNotifier {
+  HomescreenProvider({
+    required ChatRepository repository,
+  }) : _repository = repository;
+
+  final ChatRepository _repository;
+
+  StreamSubscription<List<ConversationSummary>>? _subscription;
+
+  List<ConversationSummary> _allConversations = [];
+
+  bool _isLoading = false;
+  String? _errorMessage;
+  String _searchQuery = '';
+  String? _listeningUserId;
+  bool _disposed = false;
+
   bool get isLoading => _isLoading;
+
   String? get errorMessage => _errorMessage;
 
-  void listenToConversations(String currentUid) {
-    if (currentUid.isEmpty) {
+  String get searchQuery => _searchQuery;
+
+  List<ConversationSummary> get conversations {
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return List.unmodifiable(_allConversations);
+    }
+
+    return List.unmodifiable(
+      _allConversations.where((conversation) {
+        final name = conversation.otherUserName.toLowerCase();
+        final email = conversation.otherUserEmail.toLowerCase();
+        final message = conversation.lastMessage.toLowerCase();
+
+        return name.contains(query) ||
+            email.contains(query) ||
+            message.contains(query);
+      }),
+    );
+  }
+
+  void listenToConversations(String currentUserId) {
+    if (currentUserId.isEmpty) {
       _isLoading = false;
-      notifyListeners();
+      _errorMessage = 'User is not authenticated.';
+      _safeNotify();
+      return;
+    }
+
+    // Prevent multiple listeners for the same user.
+    if (_listeningUserId == currentUserId &&
+        _subscription != null) {
       return;
     }
 
     _subscription?.cancel();
+
+    _listeningUserId = currentUserId;
     _isLoading = true;
     _errorMessage = null;
+    _safeNotify();
 
-    _subscription = FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(currentUid)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
+    _subscription = _repository
+        .watchConversations(currentUserId)
         .listen(
-      (snapshot) {
-        _conversations = snapshot.docs;
-        _applySearch();
+          (conversations) {
+        _allConversations = conversations;
         _isLoading = false;
         _errorMessage = null;
-        notifyListeners();
+        _safeNotify();
       },
-      onError: (error) {
-        _errorMessage = error.toString();
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint(
+          'Conversation listener error: $error\n$stackTrace',
+        );
+
+        _allConversations = [];
         _isLoading = false;
-        _conversations = [];
-        _filteredConversations = [];
-        notifyListeners();
+        _errorMessage = 'Unable to load conversations.';
+        _safeNotify();
       },
     );
   }
 
   void searchConversations(String query) {
-    _searchQuery = query.trim().toLowerCase();
-    _applySearch();
-    notifyListeners();
+    _searchQuery = query.trim();
+    _safeNotify();
   }
 
-  void _applySearch() {
-    if (_searchQuery.isEmpty) {
-      _filteredConversations = [];
-    } else {
-      _filteredConversations = _conversations.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        final otherUserName = (data['otherUserName'] ?? '').toString().toLowerCase();
-        final lastMessage = (data['lastMessage'] ?? '').toString().toLowerCase();
-        return otherUserName.contains(_searchQuery) || lastMessage.contains(_searchQuery);
-      }).toList();
+  Future<void> stopListening() async {
+    await _subscription?.cancel();
+
+    _subscription = null;
+    _listeningUserId = null;
+    _searchQuery = '';
+    _allConversations = [];
+    _errorMessage = null;
+    _isLoading = false;
+
+    _safeNotify();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
     }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _subscription?.cancel();
     super.dispose();
   }

@@ -1,308 +1,417 @@
 import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hay_chat/core/services/notification_service.dart';
 
 import '../data/models/chat_model.dart';
 
 class ChatProvider extends ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  ChatProvider({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  bool _isSending = false;
+  String? _errorMessage;
   String? _currentUserName;
+  String? _activeConversationId;
+  bool _disposed = false;
+
+  bool get isSending => _isSending;
+
+  String? get errorMessage => _errorMessage;
+
   String? get currentUserName => _currentUserName;
 
-  // Track which chat is currently active to filter notifications
-  String? _activeChatUserId;
-  String? get activeChatUserId => _activeChatUserId;
-
-  StreamSubscription? _globalMessageSubscription;
-  final Map<String, StreamSubscription> _conversationMessageSubscriptions = {};
-
-  String get currentUserDisplayName =>
-      _currentUserName ?? _auth.currentUser?.displayName ?? 'User';
-
-  void setActiveChatUser(String? userId) {
-    if (_activeChatUserId == userId) return;
-    _activeChatUserId = userId;
+  String get currentUserDisplayName {
+    return _currentUserName ??
+        _auth.currentUser?.displayName ??
+        'User';
   }
 
-  /// Starts listening to ALL incoming messages for the current user.
-  /// This should be called once the user is logged in (e.g., in HomeScreen).
-  void startGlobalMessageListener() {
-    final currentUid = _auth.currentUser?.uid;
-    if (currentUid == null || _globalMessageSubscription != null) return;
+  String? get currentUserId => _auth.currentUser?.uid;
 
-    // Listen below the current user's conversations to avoid collection-group
-    // indexes and keep the listener scoped to this user's data.
-    _globalMessageSubscription = _firestore
-        .collection('conversation')
-        .doc(currentUid)
-        .collection('messages')
-        .snapshots()
-        .listen(
-          (snapshot) {
-            final senderIds = snapshot.docs.map((doc) => doc.id).toSet();
-            for (final senderId in senderIds) {
-              _listenToConversationMessages(senderId, currentUid);
-            }
+  String? get activeConversationId => _activeConversationId;
 
-            for (final senderId
-                in _conversationMessageSubscriptions.keys.toList()) {
-              if (!senderIds.contains(senderId)) {
-                _conversationMessageSubscriptions.remove(senderId)?.cancel();
-              }
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            debugPrint('Global message listener error: $error');
-          },
-        );
+  void setActiveConversation(String? conversationId) {
+    _activeConversationId = conversationId;
   }
 
-  void _listenToConversationMessages(String senderId, String currentUid) {
-    if (_conversationMessageSubscriptions.containsKey(senderId)) return;
+  String createConversationId(
+      String firstUserId,
+      String secondUserId,
+      ) {
+    final userIds = [firstUserId, secondUserId]..sort();
 
-    final messagesRef = _firestore
-        .collection('conversation')
-        .doc(currentUid)
-        .collection('messages')
-        .doc(senderId)
-        .collection('chats');
-
-    _conversationMessageSubscriptions[senderId] = messagesRef
-        .snapshots()
-        .listen(
-          (snapshot) {
-            for (final change in snapshot.docChanges) {
-              if (change.type != DocumentChangeType.added) continue;
-
-              final data = change.doc.data();
-              if (data?['isSeen'] != false) continue;
-
-              final messageSenderId = data?['sender'] as String?;
-              final messageText = data?['message'] as String?;
-              if (messageSenderId == null ||
-                  messageText == null ||
-                  messageText.isEmpty) {
-                continue;
-              }
-
-              if (messageSenderId != _activeChatUserId &&
-                  messageSenderId != currentUid) {
-                _triggerNotification(messageSenderId, messageText);
-              }
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            debugPrint('Messages listener error for $senderId: $error');
-          },
-        );
-  }
-
-  Future<void> _triggerNotification(String senderId, String message) async {
-    try {
-        // Fetch the sender name for the notification title.
-      final senderDoc = await _firestore
-          .collection('users')
-          .doc(senderId)
-          .get();
-      final senderData = senderDoc.data();
-      final senderName = senderData?['name'] ?? 'New Message';
-
-      await NotificationService.instance.showMessageNotification(
-        id: _notificationIdForSender(senderId),
-        senderUid: senderId,
-        title: senderName,
-        body: message,
-      );
-    } catch (e) {
-      debugPrint('Error triggering notification: $e');
-    }
-  }
-
-  int _notificationIdForSender(String senderUid) {
-    var hash = 0;
-    for (final codeUnit in senderUid.codeUnits) {
-      hash = (hash * 31 + codeUnit) & 0x7fffffff;
-    }
-    return hash == 0 ? 1 : hash;
-  }
-
-  void stopGlobalMessageListener() {
-    _globalMessageSubscription?.cancel();
-    _globalMessageSubscription = null;
-    for (final subscription in _conversationMessageSubscriptions.values) {
-      subscription.cancel();
-    }
-    _conversationMessageSubscriptions.clear();
+    return '${userIds[0]}_${userIds[1]}';
   }
 
   Future<void> fetchCurrentUserName() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
+    final userId = _auth.currentUser?.uid;
+
+    if (userId == null) return;
 
     try {
-      final doc = await _firestore.collection('users').doc(uid).get();
-      if (doc.exists) {
-        final name = doc.data()?['name'] as String?;
-        if (name != null && name != _currentUserName) {
-          _currentUserName = name;
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching current user name: $e');
-    }
-  }
-
-  Future<void> markMessagesAsSeen(String receiverUid) async {
-    final currentUid = _auth.currentUser?.uid;
-    if (currentUid == null || receiverUid.isEmpty) return;
-
-    try {
-      final batch = _firestore.batch();
-
-      final myMetaRef = _firestore
-          .collection('conversation')
-          .doc(currentUid)
-          .collection('messages')
-          .doc(receiverUid);
-      batch.set(myMetaRef, {
-        'unreadCount': 0,
-        'isSeen': true,
-      }, SetOptions(merge: true));
-
-      final incomingMessages = await _firestore
-          .collection('conversation')
-          .doc(currentUid)
-          .collection('messages')
-          .doc(receiverUid)
-          .collection('chats')
+      final userDocument = await _firestore
+          .collection('users')
+          .doc(userId)
           .get();
 
-      for (final doc in incomingMessages.docs) {
-        final data = doc.data();
-        if (data['sender'] == receiverUid && data['isSeen'] == false) {
-          batch.update(doc.reference, {'isSeen': true, 'isReceived': true});
-        }
-      }
+      final name = userDocument.data()?['name'] as String?;
 
-      await batch.commit();
-    } catch (e) {
-      debugPrint('Error marking messages as seen: $e');
+      if (name != null && name.trim().isNotEmpty) {
+        _currentUserName = name.trim();
+        _safeNotify();
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Unable to fetch current user name: '
+            '$error\n$stackTrace',
+      );
     }
   }
 
-  Future<void> sendMessage({
+  Stream<List<ChatModel>> getChatStream(
+      String receiverUserId,
+      ) {
+    final currentUserId = _auth.currentUser?.uid;
+
+    if (currentUserId == null ||
+        receiverUserId.isEmpty) {
+      return Stream.value([]);
+    }
+
+    final conversationId = createConversationId(
+      currentUserId,
+      receiverUserId,
+    );
+
+    return _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('clientSentAt')
+        .snapshots()
+        .map((snapshot) {
+      final messages = snapshot.docs
+          .map(ChatModel.fromFirestore)
+          .toList();
+
+      messages.sort((first, second) {
+        final firstTime = first.displayTime;
+        final secondTime = second.displayTime;
+
+        if (firstTime == null && secondTime == null) {
+          return first.id.compareTo(second.id);
+        }
+
+        if (firstTime == null) return -1;
+        if (secondTime == null) return 1;
+
+        final result = firstTime.compareTo(secondTime);
+
+        if (result == 0) {
+          return first.id.compareTo(second.id);
+        }
+
+        return result;
+      });
+
+      return messages;
+    });
+  }
+
+  Future<bool> sendMessage({
     required String receiverUid,
     required String text,
     required String receiverName,
-    String? receiverProfile,
     String? receiverEmail,
+    String? receiverProfile,
   }) async {
-    final currentUid = _auth.currentUser?.uid;
-    if (currentUid == null || receiverUid.isEmpty || text.trim().isEmpty) {
-      return;
+    final currentUser = _auth.currentUser;
+    final currentUserId = currentUser?.uid;
+    final cleanedText = text.trim();
+
+    if (currentUserId == null ||
+        receiverUid.isEmpty ||
+        cleanedText.isEmpty ||
+        currentUserId == receiverUid) {
+      return false;
     }
 
+    _isSending = true;
+    _errorMessage = null;
+    _safeNotify();
+
     try {
-      final chatMessage = ChatModel(
-        sender: currentUid,
-        receiver: receiverUid,
-        message: text.trim(),
-        type: MessageType.text.name,
-        dateTimestamp: DateTime.now(),
-        isSeen: false,
-        isReceived: true,
+      final conversationId = createConversationId(
+        currentUserId,
+        receiverUid,
       );
+
+      final conversationReference = _firestore
+          .collection('conversations')
+          .doc(conversationId);
+
+      final messageReference = conversationReference
+          .collection('messages')
+          .doc();
+
+      final messageId = messageReference.id;
+
+      final senderSummaryReference = _firestore
+          .collection('userChats')
+          .doc(currentUserId)
+          .collection('conversations')
+          .doc(conversationId);
+
+      final receiverSummaryReference = _firestore
+          .collection('userChats')
+          .doc(receiverUid)
+          .collection('conversations')
+          .doc(conversationId);
 
       final batch = _firestore.batch();
-      final messageData = chatMessage.toMap()
-        ..['dateTimestamp'] = FieldValue.serverTimestamp();
 
-      final senderChatRef = _firestore
-          .collection('conversation')
-          .doc(currentUid)
-          .collection('messages')
-          .doc(receiverUid)
-          .collection('chats')
-          .doc();
-      final msgId = senderChatRef.id;
-
-      final receiverChatRef = _firestore
-          .collection('conversation')
-          .doc(receiverUid)
-          .collection('messages')
-          .doc(currentUid)
-          .collection('chats')
-          .doc(msgId);
-
-      batch.set(senderChatRef, messageData);
-      batch.set(receiverChatRef, messageData);
-
-      final metaDataSender = {
-        'lastMessage': text.trim(),
-        'timestamp': FieldValue.serverTimestamp(),
-        'otherUserUid': receiverUid,
-        'otherUserName': receiverName,
-        'otherUserEmail': receiverEmail,
-        'otherUserProfile': receiverProfile,
-        'lastMessageSenderId': currentUid,
-        'isSeen': false,
-        'isReceived': true,
-      };
-
-      final metaDataReceiver = {
-        'lastMessage': text.trim(),
-        'timestamp': FieldValue.serverTimestamp(),
-        'otherUserUid': currentUid,
-        'otherUserName': currentUserDisplayName,
-        'otherUserEmail': _auth.currentUser?.email,
-        'otherUserProfile': _auth.currentUser?.photoURL,
-        'lastMessageSenderId': currentUid,
-        'isSeen': false,
-        'isReceived': true,
-        'unreadCount': FieldValue.increment(1),
-      };
+      final message = ChatModel(
+        id: messageId,
+        senderId: currentUserId,
+        receiverId: receiverUid,
+        message: cleanedText,
+        type: MessageType.text.name,
+        clientSentAt: DateTime.now(),
+      );
 
       batch.set(
-        senderChatRef.parent.parent!,
-        metaDataSender,
+        messageReference,
+        message.toFirestore(),
+      );
+
+      batch.set(
+        conversationReference,
+        {
+          'conversationId': conversationId,
+          'memberIds': [currentUserId, receiverUid],
+          'lastMessageId': messageId,
+          'lastMessage': cleanedText,
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'lastMessageSenderId': currentUserId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
         SetOptions(merge: true),
       );
+
       batch.set(
-        receiverChatRef.parent.parent!,
-        metaDataReceiver,
+        senderSummaryReference,
+        {
+          'conversationId': conversationId,
+          'otherUserUid': receiverUid,
+          'otherUserName': receiverName,
+          'otherUserEmail': receiverEmail ?? '',
+          'otherUserProfile': receiverProfile,
+          'lastMessage': cleanedText,
+          'lastMessageId': messageId,
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'lastMessageSenderId': currentUserId,
+          'lastMessageIsDelivered': false,
+          'lastMessageIsSeen': false,
+          'unreadCount': 0,
+        },
+        SetOptions(merge: true),
+      );
+
+      batch.set(
+        receiverSummaryReference,
+        {
+          'conversationId': conversationId,
+          'otherUserUid': currentUserId,
+          'otherUserName': currentUserDisplayName,
+          'otherUserEmail': currentUser?.email ?? '',
+          'otherUserProfile': currentUser?.photoURL,
+          'lastMessage': cleanedText,
+          'lastMessageId': messageId,
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'lastMessageSenderId': currentUserId,
+          'lastMessageIsDelivered': false,
+          'lastMessageIsSeen': false,
+          'unreadCount': FieldValue.increment(1),
+        },
         SetOptions(merge: true),
       );
 
       await batch.commit();
-    } catch (e) {
-      debugPrint('Send error: $e');
+
+      return true;
+    } on FirebaseException catch (error, stackTrace) {
+      debugPrint(
+        'Send message Firebase error: '
+            '${error.code} ${error.message}\n$stackTrace',
+      );
+
+      _errorMessage =
+          error.message ?? 'Unable to send message.';
+
+      return false;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Send message error: $error\n$stackTrace',
+      );
+
+      _errorMessage = 'Unable to send message.';
+
+      return false;
+    } finally {
+      _isSending = false;
+      _safeNotify();
     }
   }
 
-  Stream<QuerySnapshot> getChatStream(String receiverUid) {
-    final currentUid = _auth.currentUser?.uid;
-    if (currentUid == null || receiverUid.isEmpty) {
-      return const Stream.empty();
+  /// Call this only when the receiver actually opens the chat.
+  ///
+  /// This is the method that fixes the incorrect blue-tick issue.
+  Future<void> markMessagesAsSeen(
+      String otherUserId,
+      ) async {
+    final currentUserId = _auth.currentUser?.uid;
+
+    if (currentUserId == null ||
+        otherUserId.isEmpty ||
+        currentUserId == otherUserId) {
+      return;
     }
 
-    return _firestore
-        .collection('conversation')
-        .doc(currentUid)
-        .collection('messages')
-        .doc(receiverUid)
-        .collection('chats')
-        .orderBy('dateTimestamp', descending: false)
-        .snapshots();
+    final conversationId = createConversationId(
+      currentUserId,
+      otherUserId,
+    );
+
+    try {
+      final conversationReference = _firestore
+          .collection('conversations')
+          .doc(conversationId);
+
+      final conversationDocument =
+      await conversationReference.get();
+
+      final conversationData =
+      conversationDocument.data();
+
+      final lastMessageId =
+      conversationData?['lastMessageId'] as String?;
+
+      final unreadMessagesSnapshot =
+      await conversationReference
+          .collection('messages')
+          .where(
+        'receiverId',
+        isEqualTo: currentUserId,
+      )
+          .where('seenAt', isNull: true)
+          .limit(400)
+          .get();
+
+      final batch = _firestore.batch();
+      final updatedMessageIds = <String>{};
+
+      for (final document
+      in unreadMessagesSnapshot.docs) {
+        updatedMessageIds.add(document.id);
+
+        batch.update(
+          document.reference,
+          {
+            'deliveredAt':
+            FieldValue.serverTimestamp(),
+            'seenAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
+
+      final mySummaryReference = _firestore
+          .collection('userChats')
+          .doc(currentUserId)
+          .collection('conversations')
+          .doc(conversationId);
+
+      batch.set(
+        mySummaryReference,
+        {
+          'unreadCount': 0,
+          'lastMessageIsDelivered': true,
+          'lastMessageIsSeen': true,
+        },
+        SetOptions(merge: true),
+      );
+
+      /*
+       * Only change the sender's last-message tick when the
+       * last message is one of the messages being marked.
+       *
+       * This prevents an older received message from making
+       * a newer outgoing message appear seen.
+       */
+      if (lastMessageId != null &&
+          updatedMessageIds.contains(lastMessageId)) {
+        final senderSummaryReference = _firestore
+            .collection('userChats')
+            .doc(otherUserId)
+            .collection('conversations')
+            .doc(conversationId);
+
+        batch.set(
+          senderSummaryReference,
+          {
+            'lastMessageIsDelivered': true,
+            'lastMessageIsSeen': true,
+          },
+          SetOptions(merge: true),
+        );
+      }
+
+      await batch.commit();
+    } on FirebaseException catch (error, stackTrace) {
+      debugPrint(
+        'Mark seen Firebase error: '
+            '${error.code} ${error.message}\n$stackTrace',
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Mark messages as seen error: '
+            '$error\n$stackTrace',
+      );
+    }
+  }
+
+  void clearError() {
+    _errorMessage = null;
+    _safeNotify();
+  }
+
+  /*
+   * Keep these temporarily if HomeScreen already calls them.
+   *
+   * Firestore local listeners should not be your production
+   * background notification system. Use Firebase Messaging
+   * and a trusted backend/Cloud Function instead.
+   */
+  void startGlobalMessageListener() {}
+
+  void stopGlobalMessageListener() {}
+
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   @override
   void dispose() {
-    stopGlobalMessageListener();
+    _disposed = true;
     super.dispose();
   }
 }

@@ -3,9 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
-import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 import 'package:hay_chat/features/chat/presentation/providers/chat_provider.dart';
-import 'package:hay_chat/shared/presentation/data/nav_bar_provider.dart';
+import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
@@ -22,21 +21,32 @@ class Homescreen extends StatefulWidget {
 }
 
 class _HomescreenState extends State<Homescreen> {
-  final TextEditingController searchController = TextEditingController();
-  final String _currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  final TextEditingController _searchController =
+  TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HomescreenProvider>().listenToConversations(_currentUid);
-      context.read<ChatProvider>().startGlobalMessageListener();
-    });
+
+    final currentUserId =
+        FirebaseAuth.instance.currentUser?.uid;
+
+    if (currentUserId != null) {
+      context
+          .read<HomescreenProvider>()
+          .listenToConversations(currentUserId);
+    }
+
+    /*
+     * Prefer starting this once from your authenticated app shell
+     * instead of every time Homescreen is opened.
+     */
+    context.read<ChatProvider>().startGlobalMessageListener();
   }
 
   @override
   void dispose() {
-    searchController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -45,35 +55,69 @@ class _HomescreenState extends State<Homescreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.background,
         title: Text(
           AppStrings.appName,
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+          style: Theme.of(context)
+              .textTheme
+              .headlineLarge
+              ?.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: AppColors.background,
         actions: [
           PopupMenuButton<int>(
-            onSelected: onMenuSelected,
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 1, child: Text('LogOut')),
+            onSelected: _onMenuSelected,
+            itemBuilder: (context) => const [
+              PopupMenuItem<int>(
+                value: 1,
+                child: Text('Log out'),
+              ),
             ],
           ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(70),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              12,
+            ),
             child: TextField(
-              controller: searchController,
-              onChanged: (value) {
-                context.read<HomescreenProvider>().searchConversations(value);
-              },
-              style: const TextStyle(color: AppColors.textPrimary),
+              controller: _searchController,
+              onChanged: context
+                  .read<HomescreenProvider>()
+                  .searchConversations,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+              ),
               decoration: InputDecoration(
-                hintText: 'Search Conversation',
-                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                hintText: 'Search conversations',
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: AppColors.primary,
+                ),
+                suffixIcon: Consumer<HomescreenProvider>(
+                  builder: (context, provider, child) {
+                    if (provider.searchQuery.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return IconButton(
+                      onPressed: () {
+                        _searchController.clear();
+
+                        context
+                            .read<HomescreenProvider>()
+                            .searchConversations('');
+                      },
+                      icon: const Icon(Icons.close),
+                    );
+                  },
+                ),
                 filled: true,
                 fillColor: AppColors.inputBackground,
                 border: OutlineInputBorder(
@@ -86,87 +130,180 @@ class _HomescreenState extends State<Homescreen> {
         ),
       ),
       body: Consumer<HomescreenProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+        builder: (context, provider, child) {
+          if (provider.isLoading &&
+              provider.conversations.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
           }
 
           if (provider.errorMessage != null) {
-            return Center(
-              child: Text(
-                provider.errorMessage!,
-                style: const TextStyle(color: AppColors.error),
-              ),
+            return _buildErrorState(
+              provider.errorMessage!,
             );
           }
 
           if (provider.conversations.isEmpty) {
+            if (provider.searchQuery.isNotEmpty) {
+              return const Center(
+                child: Text(
+                  'No matching conversations found.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            }
+
             return const NoConversationWidget();
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: provider.conversations.length,
-            separatorBuilder: (context, index) =>
-                const Divider(color: AppColors.divider, indent: 80, height: 1),
-            itemBuilder: (context, index) {
-              final data = provider.conversations[index].data() as Map<String, dynamic>;
-              final otherUserId = data['otherUserUid'] as String;
+          return RefreshIndicator(
+            onRefresh: () async {
+              final currentUserId =
+                  FirebaseAuth.instance.currentUser?.uid;
 
-              return StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection('users').doc(otherUserId).snapshots(),
-                builder: (context, userSnapshot) {
-                  UserModel user;
-                  if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                    user = UserModel.fromJson(userSnapshot.data!.data() as Map<String, dynamic>, otherUserId);
-                  } else {
-                    user = UserModel(
-                      uid: otherUserId,
-                      name: data['otherUserName'] ?? 'User',
-                      email: data['otherUserEmail'] ?? '',
-                      profilePicture: data['otherUserProfile'],
-                    );
-                  }
-
-                  return HomeContactTile(
-                    user: user,
-                    lastMessage: data['lastMessage'],
-                    timestamp: data['timestamp'] as Timestamp?,
-                    isSeen: data['isSeen'] ?? false,
-                    isReceived: data['isReceived'] ?? false,
-                    lastMessageSenderId: data['lastMessageSenderId'],
-                    unreadCount: data['unreadCount'] ?? 0,
-                    onTap: () async {
-                      await context
-                          .read<ChatProvider>()
-                          .markMessagesAsSeen(otherUserId);
-                      if (!context.mounted) return;
-                      Navigator.pushNamed(
-                        context,
-                        ChatScreen.routeName,
-                        arguments: user,
-                      );
-                    },
-                  );
-                },
-              );
+              if (currentUserId != null) {
+                provider.listenToConversations(
+                  currentUserId,
+                );
+              }
             },
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(
+                vertical: 8,
+              ),
+              itemCount: provider.conversations.length,
+              separatorBuilder: (context, index) {
+                return const Divider(
+                  color: AppColors.divider,
+                  indent: 80,
+                  height: 1,
+                );
+              },
+              itemBuilder: (context, index) {
+                final conversation =
+                provider.conversations[index];
+
+                final user = UserModel(
+                  uid: conversation.otherUserUid,
+                  name: conversation.otherUserName,
+                  email: conversation.otherUserEmail,
+                  profilePicture:
+                  conversation.otherUserProfile,
+                );
+
+                /*
+                 * Your existing tile expects Timestamp?.
+                 * This converts DateTime back only at the UI boundary.
+                 *
+                 * Prefer changing HomeContactTile.timestamp
+                 * to DateTime? later.
+                 */
+                final timestamp =
+                conversation.lastMessageAt == null
+                    ? null
+                    : Timestamp.fromDate(
+                  conversation.lastMessageAt!,
+                );
+
+                return HomeContactTile(
+                  user: user,
+                  lastMessage:
+                  conversation.lastMessage,
+                  timestamp: timestamp,
+                  isSeen:
+                  conversation.lastMessageIsSeen,
+                  isReceived:
+                  conversation.lastMessageIsDelivered,
+                  lastMessageSenderId:
+                  conversation.lastMessageSenderId,
+                  unreadCount:
+                  conversation.unreadCount,
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      ChatScreen.routeName,
+                      arguments: user,
+                    );
+                  },
+                );
+              },
+            ),
           );
         },
       ),
     );
   }
 
-  void onMenuSelected(int value) {
-    if (value == 1) logout();
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 56,
+              color: AppColors.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () {
+                final currentUserId =
+                    FirebaseAuth
+                        .instance
+                        .currentUser
+                        ?.uid;
+
+                if (currentUserId != null) {
+                  context
+                      .read<HomescreenProvider>()
+                      .listenToConversations(
+                    currentUserId,
+                  );
+                }
+              },
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  void logout() {
-    FirebaseAuth.instance.signOut();
+  void _onMenuSelected(int value) {
+    if (value == 1) {
+      _logout();
+    }
+  }
+
+  Future<void> _logout() async {
+    final homeProvider =
+    context.read<HomescreenProvider>();
+    final chatProvider =
+    context.read<ChatProvider>();
+
+    chatProvider.stopGlobalMessageListener();
+    await homeProvider.stopListening();
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
     Navigator.pushNamedAndRemoveUntil(
       context,
       SignInScreen.routeName,
-      (route) => false,
+          (route) => false,
     );
   }
 }

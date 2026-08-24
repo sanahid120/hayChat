@@ -38,7 +38,7 @@ class AppRoutes {
         break;
 
       case ChatScreen.routeName:
-        final user = settings.arguments as UserModel?;
+        final user = settings.arguments as UserModel;
         widget = ChatScreen(receiverUser: user);
         break;
 

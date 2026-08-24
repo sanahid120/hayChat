@@ -1,81 +1,127 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 
-import '../../../../app/models/user_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:hay_chat/app/models/user_model.dart';
+
+import '../../../../auth/repository/chat_repository.dart';
 
 class ContactScreenProvider extends ChangeNotifier {
+  ContactScreenProvider({
+    required ChatRepository repository,
+    FirebaseAuth? auth,
+  }) : _repository = repository,
+       _auth = auth ?? FirebaseAuth.instance;
+
+  final ChatRepository _repository;
+  final FirebaseAuth _auth;
+
+  Timer? _debounce;
+
+  int _requestVersion = 0;
+  bool _disposed = false;
   bool _isLoading = false;
-  bool get isLoading => _isLoading;
+
+  String _query = '';
   String? _error;
-  String? get error => _error;
   List<UserModel> _searchResults = [];
-  UserModel? _userDetails;
 
-  List<UserModel> get searchResults => _searchResults;
-  UserModel? get userDetails => _userDetails;
+  bool get isLoading => _isLoading;
 
-  void searchEmail(String email) {
-    final query = email.trim();
-    if (query.isEmpty) {
+  bool get isSearching => _query.isNotEmpty;
+
+  String get query => _query;
+
+  String? get error => _error;
+
+  List<UserModel> get searchResults => List.unmodifiable(_searchResults);
+
+  void updateSearchQuery(String value) {
+    _query = value.trim();
+    _debounce?.cancel();
+
+    if (_query.isEmpty) {
+      _requestVersion++;
       _isLoading = false;
-      _searchResults = [];
       _error = null;
-      notifyListeners();
+      _searchResults = [];
+      _safeNotify();
       return;
     }
 
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    _safeNotify();
 
-    FirebaseFirestore.instance
-        .collection('users')
-        .where('email', isEqualTo: query)
-        .get()
-        .then((querySnapshot) {
-          final results = querySnapshot.docs
-              .map((doc) => UserModel.fromJson(doc.data(), doc.id))
-              .where(
-                (user) => user.uid != FirebaseAuth.instance.currentUser?.uid,
-              )
-              .toList();
-
-          _searchResults = results;
-          _isLoading = false;
-          notifyListeners();
-        })
-        .catchError((error) {
-          _error = error.toString();
-          _isLoading = false;
-          notifyListeners();
-        });
+    _debounce = Timer(const Duration(seconds: 3), () {
+      searchEmail(_query);
+    });
   }
 
-  void getUserById(String userId) {
+  Future<void> searchEmail(String email) async {
+    final currentUserId = _auth.currentUser?.uid;
+    final normalizedEmail = email.trim();
+
+    if (currentUserId == null || normalizedEmail.isEmpty) {
+      return;
+    }
+
+    final currentRequest = ++_requestVersion;
+
+    _query = normalizedEmail;
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _safeNotify();
 
-    FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .get()
-        .then((doc) {
-          if (doc.exists) {
-            final user = UserModel.fromJson(doc.data()!, doc.id);
-            _userDetails = user;
-          } else {
-            _userDetails = null;
-            _error = 'User not found';
-          }
-          _isLoading = false;
-          notifyListeners();
-        })
-        .catchError((error) {
-          _error = error.toString();
-          _isLoading = false;
-          notifyListeners();
-        });
+    try {
+      final results = await _repository.searchUsersByEmail(
+        email: normalizedEmail,
+        currentUserId: currentUserId,
+      );
+
+      if (currentRequest != _requestVersion) {
+        return;
+      }
+
+      _searchResults = results;
+      _error = null;
+    } catch (error, stackTrace) {
+      debugPrint('Contact search error: $error\n$stackTrace');
+
+      if (currentRequest != _requestVersion) {
+        return;
+      }
+
+      _searchResults = [];
+      _error = 'Unable to search users.';
+    } finally {
+      if (currentRequest == _requestVersion) {
+        _isLoading = false;
+        _safeNotify();
+      }
+    }
+  }
+
+  void clearSearch() {
+    _debounce?.cancel();
+    _requestVersion++;
+
+    _query = '';
+    _error = null;
+    _isLoading = false;
+    _searchResults = [];
+
+    _safeNotify();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _debounce?.cancel();
+    super.dispose();
   }
 }

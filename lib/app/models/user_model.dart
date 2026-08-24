@@ -10,7 +10,7 @@ class UserModel {
     this.name,
     required this.email,
     this.password,
-    this.profilePicture = 'null currently',
+    this.profilePicture,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, [String? docId]) {
