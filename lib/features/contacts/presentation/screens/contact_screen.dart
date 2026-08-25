@@ -47,7 +47,7 @@ class _ContactScreenState extends State<ContactScreen> {
         backgroundColor: AppColors.background,
         title: Text(
           'Contacts',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
           ),
@@ -234,8 +234,7 @@ class _ContactScreenState extends State<ContactScreen> {
           },
           itemBuilder: (context, index) {
             final conversation = conversations[index];
-
-            final user = UserModel(
+            final conversationUser = UserModel(
               uid: conversation.otherUserUid,
               name: conversation.otherUserName,
               email: conversation.otherUserEmail,
@@ -246,11 +245,26 @@ class _ContactScreenState extends State<ContactScreen> {
                 ? null
                 : Timestamp.fromDate(conversation.lastMessageAt!);
 
-            return HomepageContactsCard(
-              user: user,
-              timestamp: timestamp,
-              onTap: () {
-                _openChat(user);
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(conversation.otherUserUid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                final user = snapshot.hasData && snapshot.data!.exists
+                    ? UserModel.fromJson(
+                        snapshot.data!.data()!,
+                        snapshot.data!.id,
+                      )
+                    : conversationUser;
+
+                return HomepageContactsCard(
+                  user: user,
+                  timestamp: timestamp,
+                  onTap: () {
+                    _openChat(user);
+                  },
+                );
               },
             );
           },

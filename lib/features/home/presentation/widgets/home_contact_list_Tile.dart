@@ -5,7 +5,7 @@ import '../../../../app/app_colors.dart';
 import '../../../../app/asset_paths.dart';
 import '../../../../app/models/user_model.dart';
 
-class HomeContactTile extends StatelessWidget {
+class HomeContactTile extends StatefulWidget {
   const HomeContactTile({
     super.key,
     required this.onTap,
@@ -27,6 +27,11 @@ class HomeContactTile extends StatelessWidget {
   final String? lastMessageSenderId;
   final int unreadCount;
 
+  @override
+  State<HomeContactTile> createState() => _HomeContactTileState();
+}
+
+class _HomeContactTileState extends State<HomeContactTile> {
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return '';
     final date = timestamp.toDate();
@@ -46,23 +51,35 @@ class HomeContactTile extends StatelessWidget {
       return '${date.day}/${date.month}/${date.year}';
     }
   }
+  ImageProvider _getImage() {
+    final profilePicture = widget.user.profilePicture;
+
+    if (profilePicture != null && profilePicture.startsWith('http')) {
+      return Image.network(profilePicture).image;
+    }
+
+    return AssetImage(AssetPaths.illustration);
+  }
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
     final String currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final bool isMe = lastMessageSenderId == currentUid;
+    final bool isMe = widget.lastMessageSenderId == currentUid;
 
     return ListTile(
-      onTap: onTap,
+      onTap: widget.onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: CircleAvatar(
         radius: 28,
-        backgroundImage: user.profilePicture != null && user.profilePicture!.startsWith('https')
-            ? Image.network(user.profilePicture!).image
-            : const AssetImage(AssetPaths.illustration) as ImageProvider,
+        backgroundColor: AppColors.surface,
+        backgroundImage: _getImage(),
       ),
       title: Text(
-        user.name ?? "User",
+        widget.user.name ?? "User",
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
@@ -72,20 +89,20 @@ class HomeContactTile extends StatelessWidget {
       ),
       subtitle: Row(
         children: [
-          if (isMe && lastMessage != null) ...[
+          if (isMe && widget.lastMessage != null) ...[
             Icon(
-              isSeen ? Icons.done_all : (isReceived ? Icons.done_all : Icons.done),
+              widget.isSeen ? Icons.done_all : (widget.isReceived ? Icons.done_all : Icons.done),
               size: 16,
-              color: isSeen ? Colors.blue : Colors.grey,
+              color: widget.isSeen ? Colors.blue : Colors.grey,
             ),
             const SizedBox(width: 4),
           ],
           Expanded(
             child: Text(
-              lastMessage ?? user.email,
+              widget.lastMessage ?? widget.user.email,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: lastMessage != null ? AppColors.textSecondary : AppColors.textHint,
-                    fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                    color: widget.lastMessage != null ? AppColors.textSecondary : AppColors.textHint,
+                    fontWeight: widget.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                   ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -98,14 +115,14 @@ class HomeContactTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            _formatTimestamp(timestamp),
+            _formatTimestamp(widget.timestamp),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: unreadCount > 0 ? AppColors.primary : AppColors.textHint,
-                  fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                  color: widget.unreadCount > 0 ? AppColors.primary : AppColors.textHint,
+                  fontWeight: widget.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
                 ),
           ),
           const SizedBox(height: 6),
-          if (unreadCount > 0)
+          if (widget.unreadCount > 0)
             Container(
               padding: const EdgeInsets.all(6),
               decoration: const BoxDecoration(
@@ -113,7 +130,7 @@ class HomeContactTile extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Text(
-                unreadCount > 99 ? '99+' : unreadCount.toString(),
+                widget.unreadCount > 99 ? '99+' : widget.unreadCount.toString(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
