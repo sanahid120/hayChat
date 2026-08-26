@@ -1,9 +1,12 @@
 allprojects {
+    ext.kotlin_version = '1.8.0'
+
     repositories {
         google()
         mavenCentral()
     }
 }
+
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory

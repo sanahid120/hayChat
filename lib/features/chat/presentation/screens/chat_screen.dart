@@ -5,6 +5,7 @@ import 'package:hay_chat/app/models/user_model.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/methods/video_call.dart';
 import '../data/models/chat_model.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/app_bar_widget.dart';
@@ -261,6 +262,18 @@ class _ChatScreenState extends State<ChatScreen>
           user: widget.receiverUser,
           onTap: () {},
         ),
+        actions: [
+          IconButton(
+            onPressed: () {
+              VideoCall.startVideoCall(context, _currentUserId, _conversationId );
+
+            },
+            icon: const Icon(
+              Icons.videocam_rounded,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
