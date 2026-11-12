@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
+import 'package:hay_chat/core/services/presence_service.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -31,7 +32,6 @@ class _HomescreenState extends State<Homescreen> {
     if (currentUserId != null) {
       context.read<HomescreenProvider>().listenToConversations(currentUserId);
     }
-
   }
 
   @override
@@ -238,6 +238,7 @@ class _HomescreenState extends State<Homescreen> {
     final homeProvider = context.read<HomescreenProvider>();
 
     await homeProvider.stopListening();
+    await PresenceService.instance.stop();
     await FirebaseAuth.instance.signOut();
 
     if (!mounted) return;

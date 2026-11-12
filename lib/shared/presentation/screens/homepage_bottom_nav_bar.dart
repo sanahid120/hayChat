@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:hay_chat/core/services/presence_service.dart';
 import 'package:hay_chat/features/contacts/presentation/screens/contact_screen.dart';
 import 'package:hay_chat/features/profile/presentation/screens/profile.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +20,34 @@ class HomepageBottomNavBar extends StatefulWidget {
   State<HomepageBottomNavBar> createState() => _HomepageBottomNavBarState();
 }
 
-class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
+class _HomepageBottomNavBarState extends State<HomepageBottomNavBar>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      unawaited(PresenceService.instance.startForUser(userId));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    unawaited(
+      PresenceService.instance.setForeground(
+        state == AppLifecycleState.resumed,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(PresenceService.instance.stop());
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<HomepageMainNavProvider>(

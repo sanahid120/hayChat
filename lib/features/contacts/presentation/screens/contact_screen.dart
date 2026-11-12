@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:hay_chat/core/services/presence_service.dart';
 import 'package:hay_chat/app/models/user_model.dart';
 import 'package:provider/provider.dart';
 
@@ -294,6 +295,7 @@ class _ContactScreenState extends State<ContactScreen> {
 
     contactProvider.clearSearch();
     await homeProvider.stopListening();
+    await PresenceService.instance.stop();
     await FirebaseAuth.instance.signOut();
 
     if (!mounted) return;

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -13,6 +16,10 @@ class NotificationService {
   String? _registeredUserId;
   String? _currentToken;
   String? activeConversationId;
+  bool _initialized = false;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<User?>? _authSubscription;
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'chat_messages',
@@ -22,40 +29,62 @@ class NotificationService {
   );
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
-    await _plugin.initialize(settings: settings);
+    try {
+      await _plugin.initialize(settings: settings);
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      await androidPlugin?.createNotificationChannel(_channel);
+      final localPermission = await androidPlugin
+          ?.requestNotificationsPermission();
+      debugPrint('Local notification permission: $localPermission');
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Local notification initialization failed: $error\n$stackTrace',
+      );
+    }
 
-    final androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    await androidPlugin?.createNotificationChannel(_channel);
-    await androidPlugin?.requestNotificationsPermission();
+    _foregroundSubscription ??= FirebaseMessaging.onMessage.listen(
+      _showForegroundMessage,
+      onError: (Object error) =>
+          debugPrint('FCM foreground listener failed: $error'),
+    );
 
     try {
-      await FirebaseMessaging.instance.requestPermission(
+      final permission = await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
+      debugPrint(
+        'FCM notification permission: ${permission.authorizationStatus}',
+      );
       _currentToken = await FirebaseMessaging.instance.getToken();
-    } catch (_) {
+      debugPrint('FCM token available: ${_currentToken != null}');
+    } catch (error, stackTrace) {
       // Local notifications still work if push registration is unavailable.
+      debugPrint('FCM setup failed: $error\n$stackTrace');
     }
-    FirebaseMessaging.onMessage.listen(_showForegroundMessage);
 
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-      _currentToken = token;
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) _saveToken(user.uid, token);
-    });
-    FirebaseAuth.instance.authStateChanges().listen((user) {
+    _tokenRefreshSubscription ??= FirebaseMessaging.instance.onTokenRefresh
+        .listen((token) {
+          _currentToken = token;
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) _saveToken(user.uid, token);
+        });
+    _authSubscription ??= FirebaseAuth.instance.authStateChanges().listen((
+      user,
+    ) {
       if (user == null) {
         _removeRegisteredToken();
       } else {
-        _registeredUserId = user.uid;
         final token = _currentToken;
         if (token != null) _saveToken(user.uid, token);
       }
@@ -71,8 +100,9 @@ class NotificationService {
           .doc(token)
           .set({'token': token, 'updatedAt': FieldValue.serverTimestamp()});
       _registeredUserId = userId;
-    } catch (_) {
+    } catch (error) {
       // A later auth or token refresh event will retry registration.
+      debugPrint('Unable to save FCM token for $userId: $error');
     }
   }
 
@@ -88,8 +118,9 @@ class NotificationService {
           .collection('fcmTokens')
           .doc(token)
           .delete();
-    } catch (_) {
+    } catch (error) {
       // Stale tokens are also removed by the notification function.
+      debugPrint('Unable to remove FCM token for $userId: $error');
     }
   }
 
@@ -99,11 +130,13 @@ class NotificationService {
       return;
     }
     final notification = message.notification;
-    if (notification == null) return;
+    final title = notification?.title ?? message.data['title'] ?? 'New message';
+    final body =
+        notification?.body ?? message.data['body'] ?? 'You received a message.';
     await showMessageNotification(
       id: message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch,
-      title: notification.title ?? 'New message',
-      body: notification.body ?? '',
+      title: title,
+      body: body,
     );
   }
 
@@ -127,11 +160,15 @@ class NotificationService {
       ),
     );
 
-    await _plugin.show(
-      id: id,
-      title: title,
-      body: body,
-      notificationDetails: details,
-    );
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: details,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Unable to show local notification: $error\n$stackTrace');
+    }
   }
 }
