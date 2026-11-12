@@ -20,23 +20,28 @@ class SignUpProvider extends ChangeNotifier {
     try {
       final UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-        email: user.email,
-        password: user.password!,
-      );
-      
+            email: user.email,
+            password: user.password!,
+          );
+
       if (userCredential.user != null) {
         final uid = userCredential.user!.uid;
 
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'uid': uid,
           'name': user.name,
           'email': user.email,
           'profilePicture': user.profilePicture,
         });
-        
-        _user = user;
+
+        _user = UserModel(
+          uid: uid,
+          name: user.name,
+          email: user.email,
+          profilePicture: user.profilePicture,
+        );
         isSuccess = true;
       }
-
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
         case 'email-already-in-use':

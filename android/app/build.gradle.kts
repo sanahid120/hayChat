@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.example.hay_chat"
-    compileSdk = 33
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.hay_chat"
-        minSdk = flutter.minSdkVersion // Zego requires at least 21
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -32,7 +32,6 @@ android {
 
     buildTypes {
         release {
-            // Zego requires ProGuard rules for release builds
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -47,5 +46,4 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}")
 }

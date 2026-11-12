@@ -51,7 +51,7 @@ class ContactScreenProvider extends ChangeNotifier {
 
     _safeNotify();
 
-    _debounce = Timer(const Duration(seconds: 3), () {
+    _debounce = Timer(const Duration(milliseconds: 450), () {
       searchEmail(_query);
     });
   }

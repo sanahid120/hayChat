@@ -6,9 +6,8 @@ import '../../../../auth/presentation/models/conversation_summary.dart';
 import '../../../../auth/repository/chat_repository.dart';
 
 class HomescreenProvider extends ChangeNotifier {
-  HomescreenProvider({
-    required ChatRepository repository,
-  }) : _repository = repository;
+  HomescreenProvider({required ChatRepository repository})
+    : _repository = repository;
 
   final ChatRepository _repository;
 
@@ -48,6 +47,11 @@ class HomescreenProvider extends ChangeNotifier {
     );
   }
 
+  int get totalUnreadCount => _allConversations.fold<int>(
+    0,
+    (total, conversation) => total + conversation.unreadCount,
+  );
+
   void listenToConversations(String currentUserId) {
     if (currentUserId.isEmpty) {
       _isLoading = false;
@@ -57,8 +61,7 @@ class HomescreenProvider extends ChangeNotifier {
     }
 
     // Prevent multiple listeners for the same user.
-    if (_listeningUserId == currentUserId &&
-        _subscription != null) {
+    if (_listeningUserId == currentUserId && _subscription != null) {
       return;
     }
 
@@ -69,26 +72,30 @@ class HomescreenProvider extends ChangeNotifier {
     _errorMessage = null;
     _safeNotify();
 
+    _repository.migrateLegacyConversationSummaries(currentUserId).catchError((
+      error,
+    ) {
+      debugPrint('Conversation migration error: $error');
+    });
+
     _subscription = _repository
         .watchConversations(currentUserId)
         .listen(
           (conversations) {
-        _allConversations = conversations;
-        _isLoading = false;
-        _errorMessage = null;
-        _safeNotify();
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        debugPrint(
-          'Conversation listener error: $error\n$stackTrace',
-        );
+            _allConversations = conversations;
+            _isLoading = false;
+            _errorMessage = null;
+            _safeNotify();
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            debugPrint('Conversation listener error: $error\n$stackTrace');
 
-        _allConversations = [];
-        _isLoading = false;
-        _errorMessage = 'Unable to load conversations.';
-        _safeNotify();
-      },
-    );
+            _allConversations = [];
+            _isLoading = false;
+            _errorMessage = 'Unable to load conversations.';
+            _safeNotify();
+          },
+        );
   }
 
   void searchConversations(String query) {

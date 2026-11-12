@@ -2,15 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/models/user_model.dart';
-import 'package:hay_chat/features/chat/presentation/providers/chat_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
 import '../../../../auth/presentation/screens/sign_in_screen.dart';
 import '../../../chat/presentation/screens/chat_screen.dart';
 import '../../../home/presentation/providers/homescreen_provider.dart';
+import '../../../home/presentation/widgets/home_contact_list_tile.dart';
 import '../providers/contact_screen_provider.dart';
-import '../widgets/contact_scree_list_Tile.dart';
+import '../widgets/contact_screen_list_tile.dart';
 
 class ContactScreen extends StatefulWidget {
   const ContactScreen({super.key});
@@ -258,9 +258,14 @@ class _ContactScreenState extends State<ContactScreen> {
                       )
                     : conversationUser;
 
-                return HomepageContactsCard(
+                return HomeContactTile(
                   user: user,
+                  lastMessage: conversation.lastMessage,
                   timestamp: timestamp,
+                  isSeen: conversation.lastMessageIsSeen,
+                  isReceived: conversation.lastMessageIsDelivered,
+                  lastMessageSenderId: conversation.lastMessageSenderId,
+                  unreadCount: conversation.unreadCount,
                   onTap: () {
                     _openChat(user);
                   },
@@ -284,11 +289,9 @@ class _ContactScreenState extends State<ContactScreen> {
   }
 
   Future<void> _logout() async {
-    final chatProvider = context.read<ChatProvider>();
     final homeProvider = context.read<HomescreenProvider>();
     final contactProvider = context.read<ContactScreenProvider>();
 
-    chatProvider.stopGlobalMessageListener();
     contactProvider.clearSearch();
     await homeProvider.stopListening();
     await FirebaseAuth.instance.signOut();

@@ -30,28 +30,43 @@ class ConversationSummary {
   });
 
   factory ConversationSummary.fromFirestore(
-      QueryDocumentSnapshot<Map<String, dynamic>> document,
-      ) {
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+    String currentUserId,
+  ) {
     final data = document.data();
-    final timestamp = data['lastMessageAt'] as Timestamp?;
+    final memberIds = List<String>.from(data['memberIds'] ?? const []);
+    final otherUserUid = memberIds.firstWhere(
+      (id) => id != currentUserId,
+      orElse: () => '',
+    );
+    final participants = Map<String, dynamic>.from(
+      data['participants'] ?? const {},
+    );
+    final otherUser = Map<String, dynamic>.from(
+      participants[otherUserUid] ?? const {},
+    );
+    final unreadCounts = Map<String, dynamic>.from(
+      data['unreadCounts'] ?? const {},
+    );
+    final seenBy = Map<String, dynamic>.from(data['seenBy'] ?? const {});
+    final deliveredTo = Map<String, dynamic>.from(
+      data['deliveredTo'] ?? const {},
+    );
+    final lastMessageAt = data['lastMessageAt'];
 
     return ConversationSummary(
-      conversationId:
-      data['conversationId'] as String? ?? document.id,
-      otherUserUid: data['otherUserUid'] as String? ?? '',
-      otherUserName: data['otherUserName'] as String? ?? 'User',
-      otherUserEmail: data['otherUserEmail'] as String? ?? '',
-      otherUserProfile: data['otherUserProfile'] as String?,
+      conversationId: document.id,
+      otherUserUid: otherUserUid,
+      otherUserName: otherUser['name'] as String? ?? 'User',
+      otherUserEmail: otherUser['email'] as String? ?? '',
+      otherUserProfile: otherUser['profilePicture'] as String?,
       lastMessage: data['lastMessage'] as String? ?? '',
       lastMessageId: data['lastMessageId'] as String?,
-      lastMessageAt: timestamp?.toDate(),
-      lastMessageSenderId:
-      data['lastMessageSenderId'] as String? ?? '',
-      unreadCount: (data['unreadCount'] as num?)?.toInt() ?? 0,
-      lastMessageIsSeen:
-      data['lastMessageIsSeen'] as bool? ?? false,
-      lastMessageIsDelivered:
-      data['lastMessageIsDelivered'] as bool? ?? false,
+      lastMessageAt: lastMessageAt is Timestamp ? lastMessageAt.toDate() : null,
+      lastMessageSenderId: data['lastMessageSenderId'] as String? ?? '',
+      unreadCount: (unreadCounts[currentUserId] as num?)?.toInt() ?? 0,
+      lastMessageIsSeen: seenBy[otherUserUid] == true,
+      lastMessageIsDelivered: deliveredTo[otherUserUid] == true,
     );
   }
 }

@@ -17,7 +17,6 @@ class SignInProvider extends ChangeNotifier {
     _signInProgress = true;
     notifyListeners();
 
-
     try {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
@@ -36,7 +35,7 @@ class SignInProvider extends ChangeNotifier {
         if (userSnapshot.exists) {
           Map<String, dynamic> userData =
               userSnapshot.data() as Map<String, dynamic>;
-          UserModel userModel = UserModel.fromJson(userData);
+          UserModel userModel = UserModel.fromJson(userData, uid);
           _user = userModel;
           if (kDebugMode) {
             print('User data: $userModel');
@@ -61,7 +60,8 @@ class SignInProvider extends ChangeNotifier {
       } else if (e.code == 'invalid-email') {
         _errorMessage = 'The email address is badly formatted.';
       } else {
-        _errorMessage = e.message ?? 'An authentication error occurred (${e.code}).';
+        _errorMessage =
+            e.message ?? 'An authentication error occurred (${e.code}).';
       }
       if (kDebugMode) {
         print('FirebaseAuthException: ${e.code} - ${e.message}');

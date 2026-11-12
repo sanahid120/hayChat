@@ -2,10 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_colors.dart';
 import 'package:hay_chat/app/models/user_model.dart';
+import 'package:hay_chat/core/services/notification_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../app/methods/video_call.dart';
 import '../data/models/chat_model.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/app_bar_widget.dart';
@@ -15,25 +15,18 @@ import '../widgets/message_input_area_widget.dart';
 class ChatScreen extends StatefulWidget {
   final UserModel receiverUser;
 
-  const ChatScreen({
-    super.key,
-    required this.receiverUser,
-  });
+  const ChatScreen({super.key, required this.receiverUser});
 
   static const String routeName = '/ChatScreen';
 
   @override
-  State<ChatScreen> createState() =>
-      _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen>
-    with WidgetsBindingObserver {
-  final TextEditingController _messageController =
-  TextEditingController();
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  final TextEditingController _messageController = TextEditingController();
 
-  final ScrollController _scrollController =
-  ScrollController();
+  final ScrollController _scrollController = ScrollController();
 
   late final ChatProvider _chatProvider;
   late final String _conversationId;
@@ -50,7 +43,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   String get _receiverUserId {
-    return widget.receiverUser.uid!;
+    return widget.receiverUser.uid ?? '';
   }
 
   @override
@@ -61,35 +54,27 @@ class _ChatScreenState extends State<ChatScreen>
 
     _chatProvider = context.read<ChatProvider>();
 
-    _conversationId =
-        _chatProvider.createConversationId(
-          _currentUserId,
-          _receiverUserId!,
-        );
-
-    _chatProvider.setActiveConversation(
-      _conversationId,
+    _conversationId = _chatProvider.createConversationId(
+      _currentUserId,
+      _receiverUserId,
     );
+
+    _chatProvider.setActiveConversation(_conversationId);
+    NotificationService.instance.activeConversationId = _conversationId;
 
     _chatProvider.fetchCurrentUserName();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _chatProvider.markMessagesAsSeen(
-        _receiverUserId!,
-      );
+      _chatProvider.markMessagesAsSeen(_receiverUserId);
     });
   }
 
   @override
-  void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      _chatProvider.markMessagesAsSeen(
-        _receiverUserId!,
-      );
+      _chatProvider.markMessagesAsSeen(_receiverUserId);
     }
   }
 
@@ -98,6 +83,7 @@ class _ChatScreenState extends State<ChatScreen>
     WidgetsBinding.instance.removeObserver(this);
 
     _chatProvider.setActiveConversation(null);
+    NotificationService.instance.activeConversationId = null;
 
     _messageController.dispose();
     _scrollController.dispose();
@@ -117,8 +103,7 @@ class _ChatScreenState extends State<ChatScreen>
       text: text,
       receiverName: widget.receiverUser.name!,
       receiverEmail: widget.receiverUser.email,
-      receiverProfile:
-      widget.receiverUser.profilePicture,
+      receiverProfile: widget.receiverUser.profilePicture,
     );
 
     if (!mounted) return;
@@ -131,8 +116,7 @@ class _ChatScreenState extends State<ChatScreen>
         ..showSnackBar(
           SnackBar(
             content: Text(
-              _chatProvider.errorMessage ??
-                  'Unable to send message.',
+              _chatProvider.errorMessage ?? 'Unable to send message.',
             ),
           ),
         );
@@ -143,60 +127,44 @@ class _ChatScreenState extends State<ChatScreen>
     _scheduleScrollToBottom(force: true);
   }
 
-  void _scheduleMarkAsSeen(
-      List<ChatModel> messages,
-      ) {
-    if (messages.isEmpty ||
-        _seenUpdateScheduled) {
+  void _scheduleMarkAsSeen(List<ChatModel> messages) {
+    if (messages.isEmpty || _seenUpdateScheduled) {
       return;
     }
 
     ChatModel? latestIncomingMessage;
 
     for (final message in messages.reversed) {
-      if (message.receiverId == _currentUserId &&
-          !message.isSeen) {
+      if (message.receiverId == _currentUserId && !message.isSeen) {
         latestIncomingMessage = message;
         break;
       }
     }
 
     if (latestIncomingMessage == null ||
-        latestIncomingMessage.id ==
-            _lastSeenMessageId) {
+        latestIncomingMessage.id == _lastSeenMessageId) {
       return;
     }
 
-    _lastSeenMessageId =
-        latestIncomingMessage.id;
+    _lastSeenMessageId = latestIncomingMessage.id;
     _seenUpdateScheduled = true;
 
-    WidgetsBinding.instance.addPostFrameCallback(
-          (_) async {
-        _seenUpdateScheduled = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _seenUpdateScheduled = false;
 
-        if (!mounted) return;
+      if (!mounted) return;
 
-        await _chatProvider.markMessagesAsSeen(
-          _receiverUserId,
-        );
-      },
-    );
+      await _chatProvider.markMessagesAsSeen(_receiverUserId);
+    });
   }
 
-  void _scheduleScrollToBottom({
-    bool force = false,
-  }) {
+  void _scheduleScrollToBottom({bool force = false}) {
     if (_scrollUpdateScheduled) return;
 
-    if (!force &&
-        _scrollController.hasClients) {
-      final position =
-          _scrollController.position;
+    if (!force && _scrollController.hasClients) {
+      final position = _scrollController.position;
 
-      final distanceFromBottom =
-          position.maxScrollExtent -
-              position.pixels;
+      final distanceFromBottom = position.maxScrollExtent - position.pixels;
 
       if (distanceFromBottom > 200) {
         return;
@@ -205,75 +173,45 @@ class _ChatScreenState extends State<ChatScreen>
 
     _scrollUpdateScheduled = true;
 
-    WidgetsBinding.instance.addPostFrameCallback(
-          (_) {
-        _scrollUpdateScheduled = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollUpdateScheduled = false;
 
-        if (!mounted ||
-            !_scrollController.hasClients) {
-          return;
-        }
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
 
-        final maxScrollExtent =
-            _scrollController
-                .position
-                .maxScrollExtent;
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
 
-        if (!_initialScrollCompleted) {
-          _initialScrollCompleted = true;
+      if (!_initialScrollCompleted) {
+        _initialScrollCompleted = true;
 
-          _scrollController.jumpTo(
-            maxScrollExtent,
-          );
+        _scrollController.jumpTo(maxScrollExtent);
 
-          return;
-        }
+        return;
+      }
 
-        _scrollController.animateTo(
-          maxScrollExtent,
-          duration:
-          const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      },
-    );
+      _scrollController.animateTo(
+        maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_currentUserId.isEmpty ||
-        _receiverUserId.isEmpty) {
+    if (_currentUserId.isEmpty || _receiverUserId.isEmpty) {
       return const Scaffold(
-        body: Center(
-          child: Text(
-            'Chat user is not available.',
-          ),
-        ),
+        body: Center(child: Text('Chat user is not available.')),
       );
     }
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor:
-        AppColors.scaffoldBackground,
+        backgroundColor: AppColors.scaffoldBackground,
         titleSpacing: 0,
-        title: AppBarWidget(
-          user: widget.receiverUser,
-          onTap: () {},
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              VideoCall.startVideoCall(context, _currentUserId, _conversationId );
-
-            },
-            icon: const Icon(
-              Icons.videocam_rounded,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
+        title: AppBarWidget(user: widget.receiverUser, onTap: () {}),
       ),
       body: SafeArea(
         top: false,
@@ -281,44 +219,29 @@ class _ChatScreenState extends State<ChatScreen>
           children: [
             Expanded(
               child: StreamBuilder<List<ChatModel>>(
-                stream: _chatProvider.getChatStream(
-                  _receiverUserId,
-                ),
+                stream: _chatProvider.getChatStream(_receiverUserId),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return _buildErrorState(
-                      snapshot.error,
-                    );
+                    return _buildErrorState(snapshot.error);
                   }
 
-                  if (snapshot.connectionState ==
-                      ConnectionState.waiting &&
+                  if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
-                    return const Center(
-                      child:
-                      CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
-                  final messages =
-                      snapshot.data ?? [];
+                  final messages = snapshot.data ?? [];
 
                   _scheduleMarkAsSeen(messages);
 
-                  final lastMessageId =
-                  messages.isEmpty
+                  final lastMessageId = messages.isEmpty
                       ? null
                       : messages.last.id;
 
-                  if (lastMessageId !=
-                      _lastRenderedMessageId) {
-                    _lastRenderedMessageId =
-                        lastMessageId;
+                  if (lastMessageId != _lastRenderedMessageId) {
+                    _lastRenderedMessageId = lastMessageId;
 
-                    _scheduleScrollToBottom(
-                      force:
-                      !_initialScrollCompleted,
-                    );
+                    _scheduleScrollToBottom(force: !_initialScrollCompleted);
                   }
 
                   if (messages.isEmpty) {
@@ -328,35 +251,22 @@ class _ChatScreenState extends State<ChatScreen>
                   return ListView.builder(
                     controller: _scrollController,
                     keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior
-                        .onDrag,
-                    padding: const EdgeInsets.only(
-                      top: 12,
-                      bottom: 12,
-                    ),
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.only(top: 12, bottom: 12),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
-                      final message =
-                      messages[index];
+                      final message = messages[index];
 
-                      final showDateHeader =
-                      _shouldShowDateHeader(
+                      final showDateHeader = _shouldShowDateHeader(
                         messages,
                         index,
                       );
 
                       return Column(
                         children: [
-                          if (showDateHeader &&
-                              message.displayTime !=
-                                  null)
-                            DateHeaderWidget(
-                              date:
-                              message.displayTime!,
-                            ),
-                          _buildMessageBubble(
-                            message,
-                          ),
+                          if (showDateHeader && message.displayTime != null)
+                            DateHeaderWidget(date: message.displayTime!),
+                          _buildMessageBubble(message),
                         ],
                       );
                     },
@@ -370,12 +280,9 @@ class _ChatScreenState extends State<ChatScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (provider.isSending)
-                      const LinearProgressIndicator(
-                        minHeight: 2,
-                      ),
+                      const LinearProgressIndicator(minHeight: 2),
                     MessageInputAreaWidget(
-                      controller:
-                      _messageController,
+                      controller: _messageController,
                       onSend: _sendMessage,
                     ),
                   ],
@@ -388,12 +295,8 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  bool _shouldShowDateHeader(
-      List<ChatModel> messages,
-      int index,
-      ) {
-    final currentDate =
-        messages[index].displayTime;
+  bool _shouldShowDateHeader(List<ChatModel> messages, int index) {
+    final currentDate = messages[index].displayTime;
 
     if (currentDate == null) {
       return false;
@@ -403,67 +306,39 @@ class _ChatScreenState extends State<ChatScreen>
       return true;
     }
 
-    final previousDate =
-        messages[index - 1].displayTime;
+    final previousDate = messages[index - 1].displayTime;
 
     if (previousDate == null) {
       return true;
     }
 
-    return currentDate.year !=
-        previousDate.year ||
-        currentDate.month !=
-            previousDate.month ||
-        currentDate.day !=
-            previousDate.day;
+    return currentDate.year != previousDate.year ||
+        currentDate.month != previousDate.month ||
+        currentDate.day != previousDate.day;
   }
 
-  Widget _buildMessageBubble(
-      ChatModel message,
-      ) {
-    final isMine =
-        message.senderId == _currentUserId;
+  Widget _buildMessageBubble(ChatModel message) {
+    final isMine = message.senderId == _currentUserId;
 
     return Align(
-      alignment: isMine
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth:
-          MediaQuery.sizeOf(context).width *
-              0.78,
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
-        margin: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 4,
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          14,
-          10,
-          10,
-          6,
-        ),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 6),
         decoration: BoxDecoration(
-          color: isMine
-              ? AppColors.senderBubble
-              : AppColors.receiverBubble,
+          color: isMine ? AppColors.senderBubble : AppColors.receiverBubble,
           borderRadius: BorderRadius.only(
-            topLeft:
-            const Radius.circular(16),
-            topRight:
-            const Radius.circular(16),
-            bottomLeft: Radius.circular(
-              isMine ? 16 : 4,
-            ),
-            bottomRight: Radius.circular(
-              isMine ? 4 : 16,
-            ),
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMine ? 16 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 16),
           ),
         ),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
@@ -477,16 +352,12 @@ class _ChatScreenState extends State<ChatScreen>
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment:
-              MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  _formatTime(
-                    message.displayTime,
-                  ),
+                  _formatTime(message.displayTime),
                   style: const TextStyle(
-                    color:
-                    AppColors.textSecondary,
+                    color: AppColors.textSecondary,
                     fontSize: 10,
                   ),
                 ),
@@ -502,30 +373,16 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
-  Widget _buildMessageStatus(
-      ChatModel message,
-      ) {
+  Widget _buildMessageStatus(ChatModel message) {
     if (message.isSeen) {
-      return const Icon(
-        Icons.done_all,
-        size: 15,
-        color: Colors.blue,
-      );
+      return const Icon(Icons.done_all, size: 15, color: Colors.blue);
     }
 
     if (message.isDelivered) {
-      return const Icon(
-        Icons.done_all,
-        size: 15,
-        color: Colors.grey,
-      );
+      return const Icon(Icons.done_all, size: 15, color: Colors.grey);
     }
 
-    return const Icon(
-      Icons.done,
-      size: 15,
-      color: Colors.grey,
-    );
+    return const Icon(Icons.done, size: 15, color: Colors.grey);
   }
 
   Widget _buildEmptyState() {
@@ -543,7 +400,7 @@ class _ChatScreenState extends State<ChatScreen>
             const SizedBox(height: 16),
             Text(
               'Start a conversation with '
-                  '${widget.receiverUser.name}',
+              '${widget.receiverUser.name}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textSecondary,
@@ -557,9 +414,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Widget _buildErrorState(Object? error) {
-    debugPrint(
-      'Chat stream error: $error',
-    );
+    debugPrint('Chat stream error: $error');
 
     return const Center(
       child: Padding(
@@ -567,9 +422,7 @@ class _ChatScreenState extends State<ChatScreen>
         child: Text(
           'Unable to load messages.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.error,
-          ),
+          style: TextStyle(color: AppColors.error),
         ),
       ),
     );
@@ -578,8 +431,6 @@ class _ChatScreenState extends State<ChatScreen>
   String _formatTime(DateTime? dateTime) {
     if (dateTime == null) return '';
 
-    return DateFormat('hh:mm a').format(
-      dateTime.toLocal(),
-    );
+    return DateFormat('hh:mm a').format(dateTime.toLocal());
   }
 }

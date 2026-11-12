@@ -144,7 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      onPopInvokedWithResult: (_, __) =>
+      onPopInvokedWithResult: (_, _) =>
           context.read<HomepageMainNavProvider>().updateIndex(0),
       canPop: false,
       child: Scaffold(
@@ -293,24 +293,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String title,
     required String subtitle,
   }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      leading: Icon(icon, color: AppColors.iconSecondary, size: 26),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.w600,
+    return Material(
+      color: AppColors.surface,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        leading: Icon(icon, color: AppColors.iconSecondary, size: 26),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
         ),
+        subtitle: Text(
+          subtitle,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: AppColors.iconSecondary),
+        onTap: () {},
       ),
-      subtitle: Text(
-        subtitle,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-      ),
-      trailing: const Icon(Icons.chevron_right, color: AppColors.iconSecondary),
-      onTap: () {},
     );
   }
 

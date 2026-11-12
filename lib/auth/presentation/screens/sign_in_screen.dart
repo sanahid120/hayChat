@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/methods/scaffold_message.dart';
@@ -38,24 +37,17 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void initState() {
     super.initState();
-    checkUser();
-  }
-
-  void checkUser() {
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
-      if (user == null) {
-        if (kDebugMode) {
-          print('User is currently signed out!');
+    if (FirebaseAuth.instance.currentUser != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            HomepageBottomNavBar.routeName,
+            (route) => false,
+          );
         }
-      } else {
-        if (!mounted) return;
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          HomepageBottomNavBar.routeName,
-          (route) => false,
-        );
-      }
-    });
+      });
+    }
   }
 
   @override

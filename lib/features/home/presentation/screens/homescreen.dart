@@ -3,14 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hay_chat/app/app_strings.dart';
 import 'package:hay_chat/app/models/user_model.dart';
-import 'package:hay_chat/features/chat/presentation/providers/chat_provider.dart';
 import 'package:hay_chat/features/chat/presentation/screens/chat_screen.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/app_colors.dart';
 import '../../../../auth/presentation/screens/sign_in_screen.dart';
 import '../providers/homescreen_provider.dart';
-import '../widgets/home_contact_list_Tile.dart';
+import '../widgets/home_contact_list_tile.dart';
 import '../widgets/no_conversation_screen_widget.dart';
 
 class Homescreen extends StatefulWidget {
@@ -33,7 +32,6 @@ class _HomescreenState extends State<Homescreen> {
       context.read<HomescreenProvider>().listenToConversations(currentUserId);
     }
 
-    context.read<ChatProvider>().startGlobalMessageListener();
   }
 
   @override
@@ -238,9 +236,7 @@ class _HomescreenState extends State<Homescreen> {
 
   Future<void> _logout() async {
     final homeProvider = context.read<HomescreenProvider>();
-    final chatProvider = context.read<ChatProvider>();
 
-    chatProvider.stopGlobalMessageListener();
     await homeProvider.stopListening();
     await FirebaseAuth.instance.signOut();
 

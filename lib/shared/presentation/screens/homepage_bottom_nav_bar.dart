@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_colors.dart';
 import '../../../features/home/presentation/screens/homescreen.dart';
+import '../../../features/home/presentation/providers/homescreen_provider.dart';
 import '../data/nav_bar_provider.dart';
 
 class HomepageBottomNavBar extends StatefulWidget {
@@ -16,7 +17,6 @@ class HomepageBottomNavBar extends StatefulWidget {
 }
 
 class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
-
   @override
   Widget build(BuildContext context) {
     return Consumer<HomepageMainNavProvider>(
@@ -24,14 +24,9 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
         return Scaffold(
           extendBody: false,
 
-
           body: IndexedStack(
             index: mainNavProvider.selectedIndex,
-            children: const [
-              Homescreen(),
-              ContactScreen(),
-              ProfileScreen(),
-            ],
+            children: const [Homescreen(), ContactScreen(), ProfileScreen()],
           ),
           bottomNavigationBar: BottomNavigationBar(
             onTap: (int index) {
@@ -44,10 +39,18 @@ class _HomepageBottomNavBarState extends State<HomepageBottomNavBar> {
             elevation: 5,
             currentIndex: mainNavProvider.selectedIndex,
             selectedItemColor: AppColors.primary,
-            items: const [
-
+            items: [
               BottomNavigationBarItem(
-                icon: Icon(Icons.wechat_outlined),
+                icon: Consumer<HomescreenProvider>(
+                  builder: (context, provider, child) {
+                    final unread = provider.totalUnreadCount;
+                    return Badge(
+                      isLabelVisible: unread > 0,
+                      label: Text(unread > 99 ? '99+' : '$unread'),
+                      child: const Icon(Icons.wechat_outlined),
+                    );
+                  },
+                ),
                 label: "Chats",
               ),
               BottomNavigationBarItem(
